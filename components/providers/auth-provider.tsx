@@ -6,80 +6,49 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth-store'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setIsAdmin, setIsLoading } = useAuthStore()
+  const { setUser, setIsAdmin, setIsLoading, reset, setIsAdminLoading } = useAuthStore()
 
   useEffect(() => {
     const supabase = createClient()
 
     // 检查管理员状态
     const checkAdmin = async (userId: string) => {
+      setIsAdminLoading(true)
       try {
-        console.log('Checking admin status for user:', userId)
-        
-        const response = await fetch('/api/auth/is-admin', {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-        })
-        
-        console.log('Admin API response status:', response.status)
-        
+        const response = await fetch('/api/auth/is-admin')
         if (!response.ok) {
-          console.error('Admin API response not OK:', response.status)
+          // 如果API返回401，说明用户未认证或session过期，这不是一个服务端错误
+          if (response.status === 401) {
+            console.log('User is not authenticated, cannot check admin status.')
+          } else {
+            // 对于其他错误（如500），则记录下来
+            console.error('Failed to check admin status:', response.status, response.statusText)
+          }
           setIsAdmin(false)
           return
         }
-        
         const data = await response.json()
-        console.log('Admin API response data:', data)
-        
         setIsAdmin(data.isAdmin || false)
       } catch (error) {
         console.error('Error checking admin status:', error)
         setIsAdmin(false)
-      }
-    }
-
-    // 获取初始 session
-    const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        console.log('Auth init - session:', session?.user?.email)
-        
-        if (session?.user) {
-          setUser(session.user)
-          // 检查管理员状态
-          await checkAdmin(session.user.id)
-        } else {
-          setUser(null)
-          setIsAdmin(false)
-        }
-      } catch (error) {
-        console.error('Auth initialization error:', error)
-        setUser(null)
-        setIsAdmin(false)
       } finally {
-        console.log('Auth loading complete')
-        setIsLoading(false)
+        setIsAdminLoading(false)
       }
     }
-
-    initAuth()
 
     // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email)
+        setIsLoading(true)
+
+        const currentUser = session?.user
         
-        if (session?.user) {
-          setUser(session.user)
-          await checkAdmin(session.user.id)
+        if (currentUser) {
+          setUser(currentUser)
+          await checkAdmin(currentUser.id)
         } else {
-          setUser(null)
-          setIsAdmin(false)
+          reset() // 用户登出或session失效时重置整个auth状态
         }
         
         setIsLoading(false)
@@ -89,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [setUser, setIsAdmin, setIsLoading])
+  }, [])
 
   return <>{children}</>
 }
