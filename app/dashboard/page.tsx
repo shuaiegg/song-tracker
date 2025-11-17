@@ -8,6 +8,7 @@ import { logout } from '../(auth)/actions'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Music, TrendingUp, Users, Settings } from 'lucide-react'
+import { AddSongForm } from '@/components/songs/add-song-form'
 
 export default function DashboardPage() {
   const { user, isAdmin, isLoading } = useAuthStore()
@@ -129,7 +130,8 @@ export default function DashboardPage() {
         </div>
 
         {/* 快速操作 */}
-        <Card>
+        <AddSongForm />
+        {/* <Card>
           <CardHeader>
             <CardTitle>快速开始</CardTitle>
             <CardDescription>
@@ -148,7 +150,7 @@ export default function DashboardPage() {
               </Button>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* 管理员专属 */}
         {isAdmin && (
