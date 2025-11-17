@@ -1,17 +1,43 @@
 // src/app/(auth)/login/page.tsx
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { login, signup } from '../actions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuthStore } from '@/store/auth-store'
+import { createClient } from '@/lib/supabase/client'
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const { reset, user, setUser } = useAuthStore()
+  const router = useRouter()
+
+  // 组件挂载时重置状态
+  useEffect(() => {
+    reset()
+  }, [reset])
+
+  // 登录成功后跳转
+  useEffect(() => {
+    if (user) {
+      router.push('/dashboard')
+    }
+  }, [user, router])
+
+  const handleAuthSuccess = async () => {
+    const supabase = createClient()
+    await supabase.auth.refreshSession()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      setUser(session.user)
+    }
+  }
 
   // 登录处理
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -30,6 +56,8 @@ export default function LoginPage() {
       const result = await login(formData)
       if (result?.error) {
         setError(result.error)
+      } else {
+        await handleAuthSuccess()
       }
     })
   }
@@ -62,6 +90,8 @@ export default function LoginPage() {
       const result = await signup(signupData)
       if (result?.error) {
         setError(result.error)
+      } else {
+        await handleAuthSuccess()
       }
     })
   }

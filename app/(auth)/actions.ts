@@ -20,7 +20,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // redirect('/dashboard') // We will handle redirect on the client side
 }
 
 export async function signup(formData: FormData) {
@@ -38,12 +38,15 @@ export async function signup(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  // redirect('/dashboard') // We will handle redirect on the client side
 }
 
 export async function logout() {
   const supabase = await createClient()
+  
+  // 退出登录
   await supabase.auth.signOut()
+  
   revalidatePath('/', 'layout')
   redirect('/login')
 }

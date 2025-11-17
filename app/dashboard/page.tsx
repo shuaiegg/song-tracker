@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth-store'
 import { logout } from '../(auth)/actions'
@@ -12,65 +12,40 @@ import { Music, TrendingUp, Users, Settings } from 'lucide-react'
 export default function DashboardPage() {
   const { user, isAdmin, isLoading } = useAuthStore()
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    setMounted(true)
-    console.log('Dashboard mounted')
-  }, [])
-
-  useEffect(() => {
-    console.log('Dashboard state:', { 
-      mounted, 
-      isLoading, 
-      hasUser: !!user,
-      userEmail: user?.email,
-      isAdmin 
-    })
-
-    if (mounted && !isLoading && !user) {
+    // 当加载完成且用户未登录时，重定向到登录页
+    if (!isLoading && !user) {
       console.log('No user, redirecting to login...')
-      router.push('/login')
+      router.replace('/login')
     }
-  }, [user, isLoading, router, mounted, isAdmin])
+  }, [user, isLoading, router])
 
   const handleLogout = async () => {
-    await logout()
+    try {
+      console.log('Logging out...')
+      await logout()
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
-  if (!mounted) {
-    console.log('Dashboard: Not mounted yet')
-    return null
-  }
-
-  if (isLoading) {
-    console.log('Dashboard: Loading...')
+  // 在加载期间或用户不存在（即将重定向）时显示加载状态
+  if (isLoading || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">加载中...</p>
           <p className="mt-2 text-xs text-muted-foreground">
-            正在验证身份...
+            {isLoading ? '正在验证身份...' : '正在跳转...'}
           </p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
-    console.log('Dashboard: No user, showing redirect message')
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground">正在跳转到登录页...</p>
-        </div>
-      </div>
-    )
-  }
-
-  console.log('Dashboard: Rendering main content')
-
+  // 确认用户存在后，渲染主内容
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* 顶部导航栏 */}
@@ -99,7 +74,7 @@ export default function DashboardPage() {
       {/* 主内容区 */}
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">欢迎回来！</h2>
+          <h2 className="text-3xl font-bold">欢迎回来！</h2>
           <p className="text-muted-foreground">
             开始追踪您喜爱的音乐数据
           </p>

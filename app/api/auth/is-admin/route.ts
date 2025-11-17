@@ -12,7 +12,7 @@ export async function GET(request: Request) {
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
-      return NextResponse.json({ isAdmin: false }, { status: 200 })
+      return NextResponse.json({ error: 'User not authenticated' }, { status: 401 })
     }
     
     // 检查是否是管理员
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     
     if (error) {
       console.error('Admin check error:', error)
-      return NextResponse.json({ isAdmin: false }, { status: 200 })
+      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
     
     const isAdmin = !!data
@@ -40,6 +40,6 @@ export async function GET(request: Request) {
     })
   } catch (error) {
     console.error('Admin check error:', error)
-    return NextResponse.json({ isAdmin: false }, { status: 200 })
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
   }
 }
