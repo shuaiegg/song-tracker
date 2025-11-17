@@ -10,12 +10,15 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Music, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { formatCount } from '@/lib/parse-douyin-data'
 
-export function AddSongForm() {
+export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
   const [trackId, setTrackId] = useState('')
   const [selectedRank, setSelectedRank] = useState<'A' | 'B' | 'C'>('C')
   const [songPreview, setSongPreview] = useState<ParsedSongInfo | null>(null)
   const [step, setStep] = useState<'input' | 'preview' | 'success'>('input')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   
   const { fetchSong, isLoading, error } = useFetchSong()
 
@@ -47,11 +50,42 @@ export function AddSongForm() {
   const handleConfirmAdd = async () => {
     if (!songPreview) return
 
-    // TODO: 调用 API 保存到数据库
-    console.log('Adding song:', songPreview, 'with rank:', selectedRank)
-    
-    // 暂时模拟成功
-    setStep('success')
+    setIsSaving(true)
+    setSaveError(null)
+
+    try {
+      const response = await fetch('/api/songs/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...songPreview,
+          rank: selectedRank,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || '添加失败')
+      }
+
+      console.log('Song added successfully:', data)
+      setStep('success')
+      
+      // 调用成功回调
+      if (onSuccess) {
+        onSuccess()
+      }
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '添加失败'
+      setSaveError(message)
+      console.error('Error adding song:', err)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   // 重置表单
@@ -60,6 +94,7 @@ export function AddSongForm() {
     setSongPreview(null)
     setStep('input')
     setSelectedRank('C')
+    setSaveError(null)
   }
 
   return (
@@ -83,6 +118,11 @@ export function AddSongForm() {
                 placeholder="例如: 7565441743598209040 或完整链接"
                 value={trackId}
                 onChange={(e) => setTrackId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && trackId.trim() && !isLoading) {
+                    handleFetchPreview()
+                  }
+                }}
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
@@ -123,13 +163,17 @@ export function AddSongForm() {
                   <img
                     src={songPreview.cover_url}
                     alt={songPreview.title}
-                    className="w-20 h-20 rounded object-cover"
+                    className="w-20 h-20 rounded object-cover flex-shrink-0"
+                    onError={(e) => {
+                      // 图片加载失败时显示占位符
+                      e.currentTarget.style.display = 'none'
+                      e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                    }}
                   />
-                ) : (
-                  <div className="w-20 h-20 rounded bg-muted flex items-center justify-center">
-                    <Music className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
+                ) : null}
+                <div className={`w-20 h-20 rounded bg-muted flex items-center justify-center flex-shrink-0 ${songPreview.cover_url ? 'hidden' : ''}`}>
+                  <Music className="h-8 w-8 text-muted-foreground" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-lg truncate">
                     {songPreview.title}
@@ -148,25 +192,25 @@ export function AddSongForm() {
                 <div className="text-center">
                   <div className="text-xs text-muted-foreground">点赞</div>
                   <div className="font-semibold">
-                    {songPreview.likes.toLocaleString()}
+                    {formatCount(songPreview.likes)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-muted-foreground">收藏</div>
                   <div className="font-semibold">
-                    {songPreview.favorites.toLocaleString()}
+                    {formatCount(songPreview.favorites)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-muted-foreground">评论</div>
                   <div className="font-semibold">
-                    {songPreview.comments.toLocaleString()}
+                    {formatCount(songPreview.comments)}
                   </div>
                 </div>
                 <div className="text-center">
                   <div className="text-xs text-muted-foreground">分享</div>
                   <div className="font-semibold">
-                    {songPreview.shares.toLocaleString()}
+                    {formatCount(songPreview.shares)}
                   </div>
                 </div>
               </div>
@@ -185,15 +229,41 @@ export function AddSongForm() {
                   <SelectItem value="C">Rank C - 每12小时（一般）</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Rank 决定数据抓取频率，可以随时修改
+              </p>
             </div>
+
+            {saveError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 rounded-lg text-sm">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <div>{saveError}</div>
+              </div>
+            )}
 
             {/* 操作按钮 */}
             <div className="flex gap-2">
-              <Button variant="outline" onClick={handleReset} className="flex-1">
+              <Button 
+                variant="outline" 
+                onClick={handleReset} 
+                className="flex-1"
+                disabled={isSaving}
+              >
                 取消
               </Button>
-              <Button onClick={handleConfirmAdd} className="flex-1">
-                确认添加
+              <Button 
+                onClick={handleConfirmAdd} 
+                className="flex-1"
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    添加中...
+                  </>
+                ) : (
+                  '确认添加'
+                )}
               </Button>
             </div>
           </div>
@@ -209,7 +279,7 @@ export function AddSongForm() {
             <div>
               <h3 className="font-semibold text-lg mb-1">添加成功！</h3>
               <p className="text-sm text-muted-foreground">
-                歌曲已开始追踪，系统将自动抓取数据
+                歌曲已开始追踪，系统将按照设定的频率自动抓取数据
               </p>
             </div>
             <Button onClick={handleReset} variant="outline">

@@ -16,7 +16,7 @@ export function parseDouyinResponse(data: any, trackId: string): ParsedSongInfo 
     }
 
     // 提取歌曲信息
-    const title = seoTrack.name || '未知歌曲'
+    const title = seoTrack.track.name || '未知歌曲'
     const artist = seoTrack.track?.artists?.[0]?.name || '未知歌手'
     const album = seoTrack.track?.album?.name || '未知专辑'
     const coverUrl = seoTrack.cover || seoTrack.cover_url || ''
