@@ -1,7 +1,7 @@
 // src/app/dashboard/page.tsx
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/auth-store'
 import { logout } from '../(auth)/actions'
@@ -9,44 +9,58 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Music, TrendingUp, Users, Settings } from 'lucide-react'
 import { AddSongForm } from '@/components/songs/add-song-form'
+import { SongList } from '@/components/songs/song-list'
 
 export default function DashboardPage() {
   const { user, isAdmin, isLoading } = useAuthStore()
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
 
   useEffect(() => {
-    // 当加载完成且用户未登录时，重定向到登录页
-    if (!isLoading && !user) {
-      console.log('No user, redirecting to login...')
-      router.replace('/login')
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (mounted && !isLoading && !user) {
+      router.push('/login')
     }
-  }, [user, isLoading, router])
+  }, [user, isLoading, router, mounted])
 
   const handleLogout = async () => {
-    try {
-      console.log('Logging out...')
-      await logout()
-    } catch (error) {
-      console.error('Logout error:', error)
-    }
+    await logout()
   }
 
-  // 在加载期间或用户不存在（即将重定向）时显示加载状态
-  if (isLoading || !user) {
+  const handleSongAdded = () => {
+    // 触发歌曲列表刷新
+    setRefreshTrigger(prev => prev + 1)
+  }
+
+  if (!mounted) {
+    return null
+  }
+
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
           <p className="mt-4 text-muted-foreground">加载中...</p>
-          <p className="mt-2 text-xs text-muted-foreground">
-            {isLoading ? '正在验证身份...' : '正在跳转...'}
-          </p>
         </div>
       </div>
     )
   }
 
-  // 确认用户存在后，渲染主内容
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-muted-foreground">正在跳转到登录页...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* 顶部导航栏 */}
@@ -75,7 +89,7 @@ export default function DashboardPage() {
       {/* 主内容区 */}
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold">欢迎回来！</h2>
+          <h2 className="text-3xl font-bold mb-2">欢迎回来！</h2>
           <p className="text-muted-foreground">
             开始追踪您喜爱的音乐数据
           </p>
@@ -129,28 +143,13 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* 快速操作 */}
-        <AddSongForm />
-        {/* <Card>
-          <CardHeader>
-            <CardTitle>快速开始</CardTitle>
-            <CardDescription>
-              添加您的第一首歌曲开始数据追踪
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Music className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">还没有追踪的歌曲</h3>
-              <p className="text-sm text-muted-foreground mb-4 max-w-sm">
-                输入抖音歌曲 ID，我们将自动为您追踪点赞、收藏、评论等数据变化
-              </p>
-              <Button size="lg">
-                添加歌曲
-              </Button>
-            </div>
-          </CardContent>
-        </Card> */}
+        {/* 歌曲添加表单 */}
+        <div className="mb-8">
+          <AddSongForm onSuccess={handleSongAdded} />
+        </div>
+
+        {/* 歌曲列表 */}
+        <SongList refreshTrigger={refreshTrigger} />
 
         {/* 管理员专属 */}
         {isAdmin && (
