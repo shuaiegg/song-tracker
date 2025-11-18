@@ -122,9 +122,8 @@ export function SongList({ refreshTrigger = 0 }: SongListProps) {
               console.log('View details:', song.id)
               // TODO: 跳转到详情页
             }}
-            onDelete={() => {
-              console.log('Delete song:', song.id)
-              // TODO: 实现删除功能
+            onDeleted={() => {
+              fetchSongs()
             }}
           />
         ))}

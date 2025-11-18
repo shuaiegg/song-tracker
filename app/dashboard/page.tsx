@@ -11,11 +11,23 @@ import { Music, TrendingUp, Users, Settings } from 'lucide-react'
 import { AddSongForm } from '@/components/songs/add-song-form'
 import { SongList } from '@/components/songs/song-list'
 
+interface DashboardStats {
+  totalSongs: number
+  todayGrowth: number
+  totalLikes: number
+}
+
 export default function DashboardPage() {
   const { user, isAdmin, isLoading } = useAuthStore()
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [stats, setStats] = useState<DashboardStats>({
+    totalSongs: 0,
+    todayGrowth: 0,
+    totalLikes: 0,
+  })
+  const [loadingStats, setLoadingStats] = useState(true)
 
   useEffect(() => {
     setMounted(true)
@@ -27,12 +39,44 @@ export default function DashboardPage() {
     }
   }, [user, isLoading, router, mounted])
 
+  // 获取统计数据
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!user) return
+
+      try {
+        const response = await fetch('/api/songs/my-songs')
+        if (response.ok) {
+          const data = await response.json()
+          const songs = data.songs || []
+          
+          const totalLikes = songs.reduce((sum: number, song: any) => 
+            sum + (song.latest_stats?.likes || 0), 0
+          )
+
+          setStats({
+            totalSongs: songs.length,
+            todayGrowth: 0, // TODO: 实现今日增长计算
+            totalLikes,
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error)
+      } finally {
+        setLoadingStats(false)
+      }
+    }
+
+    if (user) {
+      fetchStats()
+    }
+  }, [user, refreshTrigger])
+
   const handleLogout = async () => {
     await logout()
   }
 
   const handleSongAdded = () => {
-    // 触发歌曲列表刷新
     setRefreshTrigger(prev => prev + 1)
   }
 
@@ -105,9 +149,13 @@ export default function DashboardPage() {
               <Music className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              {loadingStats ? (
+                <div className="text-2xl font-bold">--</div>
+              ) : (
+                <div className="text-2xl font-bold">{stats.totalSongs}</div>
+              )}
               <p className="text-xs text-muted-foreground">
-                暂无追踪的歌曲
+                {stats.totalSongs === 0 ? '暂无追踪的歌曲' : '正在追踪中'}
               </p>
             </CardContent>
           </Card>
@@ -115,14 +163,20 @@ export default function DashboardPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                今日增长
+                总点赞数
               </CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">--</div>
+              {loadingStats ? (
+                <div className="text-2xl font-bold">--</div>
+              ) : (
+                <div className="text-2xl font-bold">
+                  {stats.totalLikes.toLocaleString()}
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">
-                添加歌曲后查看
+                所有歌曲累计点赞
               </p>
             </CardContent>
           </Card>
