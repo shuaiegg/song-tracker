@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Music, TrendingUp, Users, Settings } from 'lucide-react'
 import { AddSongForm } from '@/components/songs/add-song-form'
 import { SongList } from '@/components/songs/song-list'
+import { TriggerFetch } from '@/components/admin/trigger-fetch'
 
 interface DashboardStats {
   totalSongs: number
@@ -232,6 +233,12 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         )}
+        {isAdmin && (
+  <div className="mt-6">
+    <TriggerFetch />
+  </div>
+)}
+
       </main>
     </div>
   )

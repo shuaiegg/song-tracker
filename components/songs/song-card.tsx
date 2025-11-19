@@ -61,6 +61,7 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
     favorites: 0,
     comments: 0,
     shares: 0,
+    fetched_at: null,
   }
 
   const handleDelete = async () => {
@@ -210,7 +211,7 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
               </div>
 
               {/* 统计数据 */}
-              <div className="grid grid-cols-4 gap-2 mt-3">
+              {/* <div className="grid grid-cols-4 gap-2 mt-3">
                 <div className="flex items-center gap-1">
                   <Heart className="h-3.5 w-3.5 text-red-500" />
                   <span className="text-xs font-medium">
@@ -235,7 +236,52 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
                     {formatCount(stats.shares)}
                   </span>
                 </div>
-              </div>
+              </div> */}
+
+              {/* xin统计数据 */}
+<div className="space-y-2 mt-3">
+  <div className="grid grid-cols-4 gap-2">
+    <div className="flex items-center gap-1">
+      <Heart className="h-3.5 w-3.5 text-red-500" />
+      <span className="text-xs font-medium">
+        {formatCount(stats.likes)}
+      </span>
+    </div>
+    <div className="flex items-center gap-1">
+      <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
+      <span className="text-xs font-medium">
+        {formatCount(stats.favorites)}
+      </span>
+    </div>
+    <div className="flex items-center gap-1">
+      <MessageSquare className="h-3.5 w-3.5 text-green-500" />
+      <span className="text-xs font-medium">
+        {formatCount(stats.comments)}
+      </span>
+    </div>
+    <div className="flex items-center gap-1">
+      <Share2 className="h-3.5 w-3.5 text-purple-500" />
+      <span className="text-xs font-medium">
+        {formatCount(stats.shares)}
+      </span>
+    </div>
+  </div>
+  
+  {/* 最后更新时间 fetched_at */}
+  {stats.fetched_at && (
+    <div className="text-xs text-muted-foreground flex items-center gap-1">
+      <span>最后更新:</span>
+      <span>
+        {new Date(stats.fetched_at).toLocaleString('zh-CN', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        })}
+      </span>
+    </div>
+  )}
+</div>
             </div>
           </div>
         </CardContent>
