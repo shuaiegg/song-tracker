@@ -16,6 +16,7 @@ import {
 import { DeleteSongDialog } from './delete-song-dialog'
 import { UpdateRankDialog } from './update-rank-dialog'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
 
 interface SongCardProps {
   song: {
@@ -43,6 +44,7 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
   const [showRankDialog, setShowRankDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isUpdatingRank, setIsUpdatingRank] = useState(false)
+  const router = useRouter()
 
   const rankColors = {
     A: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
@@ -193,7 +195,7 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={onViewDetails}>
+                      <DropdownMenuItem onClick={() => router.push(`/dashboard/songs/${song.id}`)}>
                         查看详情
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setShowRankDialog(true)}>
