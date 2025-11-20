@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Music, Loader2, RefreshCw } from 'lucide-react'
 import { StatsChart } from '@/components/charts/stats-chart'
 import { StatCards } from '@/components/charts/stat-cards'
+import { DailyStatsChart } from '@/components/charts/daily-stats-chart'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -188,6 +189,11 @@ export default function SongDetailPage({ params }: PageProps) {
           title="数据趋势"
           description="最近30天的数据变化趋势"
         />
+
+        {/* 新增：每日增量图表 */}
+{data.dailyStats && data.dailyStats.length > 0 && (
+  <DailyStatsChart data={data.dailyStats} />
+)}
 
         {/* 数据点数量提示 */}
         <Card>

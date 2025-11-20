@@ -87,6 +87,71 @@ export function TriggerFetch() {
     }
   }
 
+  const triggerDailyRollup = async () => {
+  setIsLoading(prev => ({ ...prev, 'daily': true }))
+  setCurrentAlert(null)
+
+  try {
+    console.log('Triggering daily rollup...')
+
+    const response = await fetch('/api/admin/trigger-daily-rollup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+
+    const data = await response.json()
+    console.log('Daily rollup response:', data)
+
+    if (!response.ok) {
+      throw new Error(data.error || '触发失败')
+    }
+
+    const result: FetchResult = {
+      rank: 'Daily',
+      status: 'success',
+      message: `成功: ${data.data?.results?.success || 0} 首歌曲, 失败: ${data.data?.results?.failed || 0} 首, 跳过: ${data.data?.results?.skipped || 0} 首`,
+      data: data.data,
+      timestamp: new Date().toISOString(),
+    }
+
+    setResults(prev => [result, ...prev])
+
+    setCurrentAlert({
+      type: 'success',
+      message: `每日汇总完成！成功 ${data.data?.results?.success || 0} 首，失败 ${data.data?.results?.failed || 0} 首，跳过 ${data.data?.results?.skipped || 0} 首`,
+    })
+
+    setTimeout(() => setCurrentAlert(null), 5000)
+
+  } catch (error) {
+    console.error('Daily rollup error:', error)
+    const message = error instanceof Error ? error.message : '触发失败'
+    
+    const result: FetchResult = {
+      rank: 'Daily',
+      status: 'error',
+      message,
+      timestamp: new Date().toISOString(),
+    }
+
+    setResults(prev => [result, ...prev])
+
+    setCurrentAlert({
+      type: 'error',
+      message: `每日汇总失败: ${message}`,
+    })
+
+    setTimeout(() => setCurrentAlert(null), 5000)
+
+  } finally {
+    setIsLoading(prev => ({ ...prev, 'daily': false }))
+  }
+}
+
+
+
   return (
     <Card>
       <CardHeader>
@@ -127,7 +192,27 @@ export function TriggerFetch() {
             {isLoading.C && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             抓取 Rank C
           </Button>
+
+          
         </div>
+
+         {/* 新增：每日汇总按钮 */}
+  <div className="border-t pt-4">
+    <p className="text-sm text-muted-foreground mb-3">
+      每日汇总：计算每首歌曲的每日增量数据
+    </p>
+    <Button
+      onClick={triggerDailyRollup}
+      disabled={isLoading.daily}
+      variant="outline"
+      className="w-full"
+    >
+      {isLoading.daily && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      执行每日汇总
+    </Button>
+  </div>
+
+
 
         {/* 当前操作提示 */}
         {currentAlert && (
