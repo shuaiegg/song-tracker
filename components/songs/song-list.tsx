@@ -121,6 +121,7 @@ export function SongList({ refreshTrigger = 0 }: SongListProps) {
             onViewDetails={() => {
               console.log('View details:', song.id)
               // TODO: 跳转到详情页
+              window.location.href = `/dashboard/songs/${song.id}`
             }}
             onDeleted={() => {
               fetchSongs()
