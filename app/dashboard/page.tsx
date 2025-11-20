@@ -219,18 +219,20 @@ export default function DashboardPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="flex gap-4">
-                <Button variant="outline">
-                  查看所有用户
-                </Button>
-                <Button variant="outline">
-                  查看所有歌曲
-                </Button>
+                <div className="flex gap-4">
+        <Button 
+          variant="outline"
+          onClick={() => router.push('/admin')}
+        >
+          进入管理后台
+        </Button>
                 <Button variant="outline">
                   抓取日志
                 </Button>
               </div>
             </CardContent>
+          
+          
           </Card>
         )}
         {isAdmin && (

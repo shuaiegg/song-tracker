@@ -4,7 +4,13 @@ import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const page = parseInt(searchParams.get('page') || '1')
+  const limit = parseInt(searchParams.get('limit') || '20')
+  const offset = (page - 1) * limit
+
+
   try {
     const supabase = await createClient()
     
@@ -19,7 +25,7 @@ export async function GET() {
     }
 
     // 查询用户关注的歌曲
-    const { data: relations, error: relationsError } = await supabase
+    const { data: relations, error: relationsError, count } = await supabase
       .from('user_song_relations')
       .select(`
         id,
@@ -35,9 +41,10 @@ export async function GET() {
           rank,
           created_at
         )
-      `)
+      `, { count: 'exact' })
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (relationsError) {
       console.error('Error fetching user songs:', relationsError)
@@ -78,7 +85,10 @@ export async function GET() {
 
     return NextResponse.json({
       songs: songsWithStats,
-      total: songsWithStats.length,
+      total: count,
+      page,
+      limit,
+      totalPages: Math.ceil(count || 0 / limit),
     })
 
   } catch (error) {
