@@ -1,153 +1,53 @@
-// supabase/functions/daily-rollup/index.ts
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
 
-    console.log('Starting daily rollup...')
+    // 核心：决定统计哪一天。
+    // 如果你在北京时间凌晨 04:00 (UTC 20:00) 运行，你可能想统计的是【昨天】(因为今天还没过完)
+    // 或者是【UTC的今天】(即截止到运行时的快照)。
+    
+    // 假设策略：统计【昨天】的完整数据 (UTC时间)
+    // 这样确保这一天的数据已经全部入库，不再变动。
+    const dateObj = new Date();
+    dateObj.setDate(dateObj.getDate() - 1); // 减去一天
+    const targetDate = dateObj.toISOString().split('T')[0];
 
-    // 获取所有歌曲
-    const { data: songs, error: songsError } = await supabaseClient
-      .from('songs')
-      .select('id, title')
+    console.log(`Starting daily rollup via RPC for date: ${targetDate}...`);
 
-    if (songsError) {
-      throw new Error(`Error fetching songs: ${songsError.message}`)
-    }
+    // 调用数据库函数
+    const { data, error } = await supabaseClient.rpc('process_daily_song_stats', {
+      target_date: targetDate
+    });
 
-    console.log(`Found ${songs?.length || 0} songs`)
+    if (error) throw error;
 
-    const today = new Date().toISOString().split('T')[0]
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    console.log('RPC Result:', data);
 
-    const results = {
-      total: songs?.length || 0,
-      success: 0,
-      failed: 0,
-      skipped: 0,
-      errors: [] as string[],
-    }
-
-    for (const song of songs || []) {
-      try {
-        // 检查今天是否已经计算过
-        const { data: existingDaily } = await supabaseClient
-          .from('daily_stats')
-          .select('id')
-          .eq('song_id', song.id)
-          .eq('date', today)
-          .maybeSingle()
-
-        if (existingDaily) {
-          console.log(`Already calculated for ${song.title} today, skipping...`)
-          results.skipped++
-          continue
-        }
-
-        // 获取今天最后一条数据
-        const { data: todayStats } = await supabaseClient
-          .from('song_stats')
-          .select('likes, favorites, comments, shares')
-          .eq('song_id', song.id)
-          .gte('fetched_at', `${today}T00:00:00`)
-          .lte('fetched_at', `${today}T23:59:59`)
-          .order('fetched_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        // 获取昨天最后一条数据
-        const { data: yesterdayStats } = await supabaseClient
-          .from('song_stats')
-          .select('likes, favorites, comments, shares')
-          .eq('song_id', song.id)
-          .gte('fetched_at', `${yesterday}T00:00:00`)
-          .lte('fetched_at', `${yesterday}T23:59:59`)
-          .order('fetched_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        if (!todayStats) {
-          console.log(`No data for ${song.title} today, skipping...`)
-          results.skipped++
-          continue
-        }
-
-        // 计算增量
-        const likesIncrease = todayStats.likes - (yesterdayStats?.likes || 0)
-        const favoritesIncrease = todayStats.favorites - (yesterdayStats?.favorites || 0)
-        const commentsIncrease = todayStats.comments - (yesterdayStats?.comments || 0)
-        const sharesIncrease = todayStats.shares - (yesterdayStats?.shares || 0)
-
-        // 计算变化率
-        const changeRate = yesterdayStats?.likes 
-          ? ((likesIncrease / yesterdayStats.likes) * 100)
-          : 0
-
-        // 插入每日统计
-        const { error: insertError } = await supabaseClient
-          .from('daily_stats')
-          .insert({
-            song_id: song.id,
-            date: today,
-            likes: likesIncrease,
-            favorites: favoritesIncrease,
-            comments: commentsIncrease,
-            shares: sharesIncrease,
-            change_rate: changeRate,
-          })
-
-        if (insertError) {
-          throw new Error(`Insert error: ${insertError.message}`)
-        }
-
-        console.log(`✓ Calculated daily stats for ${song.title}`)
-        results.success++
-
-      } catch (error) {
-        console.error(`✗ Failed for ${song.title}:`, error)
-        results.failed++
-        results.errors.push(`${song.title}: ${error.message}`)
-      }
-    }
-
-    return new Response(
-      JSON.stringify({
-        message: 'Daily rollup completed',
-        results,
-        date: today,
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
+    return new Response(JSON.stringify(data), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
 
   } catch (error) {
-    console.error('Function error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      }
-    )
+    console.error('Error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
+    });
   }
-})
+});
