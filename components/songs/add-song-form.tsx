@@ -105,17 +105,17 @@ export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
           添加歌曲
         </CardTitle>
         <CardDescription>
-          输入抖音歌曲 ID 或完整链接开始追踪
+          输入歌曲 ID
         </CardDescription>
       </CardHeader>
       <CardContent>
         {step === 'input' && (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="track-id">歌曲 ID 或链接</Label>
+              <Label htmlFor="track-id">歌曲 ID</Label>
               <Input
                 id="track-id"
-                placeholder="例如: 7565441743598209040 或完整链接"
+                placeholder="例如: 7565441743598209040 "
                 value={trackId}
                 onChange={(e) => setTrackId(e.target.value)}
                 onKeyDown={(e) => {
