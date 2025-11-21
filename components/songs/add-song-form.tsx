@@ -126,7 +126,7 @@ export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
                 disabled={isLoading}
               />
               <p className="text-xs text-muted-foreground">
-                支持输入完整的抖音链接或直接输入 track_id
+                直接输入 track_id
               </p>
             </div>
 
