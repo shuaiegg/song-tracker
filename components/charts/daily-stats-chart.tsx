@@ -24,7 +24,7 @@ export function DailyStatsChart({ data }: DailyStatsChartProps) {
       day: '2-digit',
     }),
     点赞增量: item.likes,
-    收藏增量: item.favorites,
+    // 收藏增量: item.favorites,
     评论增量: item.comments,
     分享增量: item.shares,
   }))
@@ -68,7 +68,7 @@ export function DailyStatsChart({ data }: DailyStatsChartProps) {
             />
             <Legend />
             <Bar dataKey="点赞增量" fill="#ef4444" />
-            <Bar dataKey="收藏增量" fill="#3b82f6" />
+            {/* <Bar dataKey="收藏增量" fill="#3b82f6" /> */}
             <Bar dataKey="评论增量" fill="#22c55e" />
             <Bar dataKey="分享增量" fill="#a855f7" />
           </BarChart>

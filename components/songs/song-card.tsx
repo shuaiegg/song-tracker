@@ -249,12 +249,12 @@ export function SongCard({ song, onViewDetails, onDeleted }: SongCardProps) {
         {formatCount(stats.likes)}
       </span>
     </div>
-    <div className="flex items-center gap-1">
+    {/* <div className="flex items-center gap-1">
       <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
       <span className="text-xs font-medium">
         {formatCount(stats.favorites)}
       </span>
-    </div>
+    </div> */}
     <div className="flex items-center gap-1">
       <MessageSquare className="h-3.5 w-3.5 text-green-500" />
       <span className="text-xs font-medium">

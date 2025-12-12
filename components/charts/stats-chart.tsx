@@ -80,13 +80,13 @@ export function StatsChart({ data, title, description }: StatsChartProps) {
               strokeWidth={2}
               dot={{ r: 3 }}
             />
-            <Line 
+            {/* <Line 
               type="monotone" 
               dataKey="收藏" 
               stroke="#3b82f6" 
               strokeWidth={2}
               dot={{ r: 3 }}
-            />
+            /> */}
             <Line 
               type="monotone" 
               dataKey="评论" 

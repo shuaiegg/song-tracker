@@ -37,14 +37,14 @@ export function StatCards({ currentStats, previousStats }: StatCardsProps) {
       bgColor: 'bg-red-50 dark:bg-red-950',
       change: calculateChange(currentStats.likes, previousStats?.likes),
     },
-    {
-      title: '收藏数',
-      value: currentStats.favorites,
-      icon: TrendingUp,
-      color: 'text-blue-500',
-      bgColor: 'bg-blue-50 dark:bg-blue-950',
-      change: calculateChange(currentStats.favorites, previousStats?.favorites),
-    },
+    // {
+    //   title: '收藏数',
+    //   value: currentStats.favorites,
+    //   icon: TrendingUp,
+    //   color: 'text-blue-500',
+    //   bgColor: 'bg-blue-50 dark:bg-blue-950',
+    //   change: calculateChange(currentStats.favorites, previousStats?.favorites),
+    // },
     {
       title: '评论数',
       value: currentStats.comments,
