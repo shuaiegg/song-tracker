@@ -10,6 +10,17 @@ export interface Song {
   cover_url?: string;
   rank: RankType;
   created_at: string;
+
+    // ✨ 新增字段
+  singers?: string[];           // 歌手（数组）
+  lyricists?: string[];         // 作词（数组）
+  composers?: string[];         // 作曲（数组）
+  producers?: string[];         // 制作人（数组）
+  arrangers?: string[];         // 编曲（数组）
+  mixing_engineers?: string[];  // 混音（数组）
+  recording_engineers?: string[]; // 录音（数组）
+  album_id?: string;            // 专辑ID
+  genres?: string[]; 
 }
 
 export interface SongStats {
@@ -38,6 +49,7 @@ export interface UserSongRelation {
   user_id: string;
   song_id: string;
   created_at: string;
+  supervisor?: string;  // ✨ 新增：负责人
 }
 
 // 抖音 API 响应类型
@@ -93,4 +105,39 @@ export interface ParsedSongInfo {
   favorites: number;
   comments: number;
   shares: number;
+}
+
+// ✨ 新增：添加歌曲时的表单数据类型
+export interface SongFormData {
+  // 基本信息（从抖音API获取）
+  song_id: string;
+  title: string;
+  artist: string;
+  album: string;
+  cover_url?: string;
+  rank: RankType;
+  
+  // 统计数据
+  likes: number;
+  favorites: number;
+  comments: number;
+  shares: number;
+  
+  // ✨ 扩展信息（用户手动填写）
+  singers?: string[];
+  lyricists?: string[];
+  composers?: string[];
+  producers?: string[];
+  arrangers?: string[];
+  mixing_engineers?: string[];
+  recording_engineers?: string[];
+  album_id?: string;
+  genres?: string[];
+  supervisor?: string;  // 负责人
+}
+
+// ✨ 新增：用于自动完成的建议类型
+export interface FieldSuggestion {
+  field: keyof SongFormData;
+  values: string[];
 }
