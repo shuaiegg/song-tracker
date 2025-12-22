@@ -100,6 +100,7 @@ export interface ParsedSongInfo {
   title: string;
   artist: string;
   album: string;
+  album_id?: string;
   cover_url?: string;
   likes: number;
   favorites: number;
@@ -116,6 +117,7 @@ export interface SongFormData {
   album: string;
   cover_url?: string;
   rank: RankType;
+  album_id?: string;
   
   // 统计数据
   likes: number;
@@ -124,14 +126,14 @@ export interface SongFormData {
   shares: number;
   
   // ✨ 扩展信息（用户手动填写）
-  singers?: string[];
+  // singers?: string[];
   lyricists?: string[];
   composers?: string[];
   producers?: string[];
   arrangers?: string[];
   mixing_engineers?: string[];
   recording_engineers?: string[];
-  album_id?: string;
+
   genres?: string[];
   supervisor?: string;  // 负责人
 }

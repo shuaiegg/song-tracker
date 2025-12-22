@@ -22,7 +22,31 @@ export async function POST(request: Request) {
 
     // 解析请求体
     const body = await request.json()
-    const { song_id, title, artist, album, cover_url, rank, likes, favorites, comments, shares } = body
+    const { 
+      song_id, 
+      title, 
+      artist, 
+      album, 
+      cover_url, 
+      rank, 
+      likes, 
+      favorites, 
+      comments, 
+      shares ,
+    // ✨ 新增字段
+      singers,
+      lyricists,
+      composers,
+      producers,
+      arrangers,
+      mixing_engineers,
+      recording_engineers,
+      album_id,
+      genres,
+
+      // ✨ 负责人（用户级别）
+      supervisor,
+    } = body
 
     // 验证必填字段
     if (!song_id || !title || !artist) {
@@ -91,18 +115,83 @@ export async function POST(request: Request) {
         )
       }
 
+      // add song's extended fields if provided
+      const updateData: any = {};
+
+      //only updated the unnull fields(merge not overwrite)
+      // if(singers && singers.length > 0) {
+      //   //get current singers
+      //   const { data: currentSong } = await supabaseAdmin
+      //     .from('songs')
+      //     .select('singers')
+      //     .eq('id', songUuid)
+      //     .single()
+
+      //   const currentSingers = currentSong?.singers || [];
+      //   const mergedSingers = [...new Set([...currentSingers, ...singers])]
+      //   updateData.singers = mergedSingers;
+      // }
+
+      //repeat for other array fields
+      const arrayFields = [
+        'lyricists', 'composers', 'producers', 'arrangers',
+        'mixing_engineers', 'recording_engineers', 'genres'
+      ]
+
+      for (const field of arrayFields) {
+        if(body[field] && body[field].length > 0) {
+          const { data: currentSong } = await supabaseAdmin
+            .from('songs')
+            .select(field)
+            .eq('id', songUuid)
+            .single()
+
+          // const currentValues = currentSong?.[field] || []
+          const currentValues = (currentSong as Record<string, any>)?.[field] || [];
+          const mergedValues = [...new Set([...currentValues, ...body[field]])]
+          updateData[field] = mergedValues;
+        }
+      }
+
+    //update album_id if provided
+    if(album_id && album_id.trim()) {
+      updateData.album_id = album_id.trim();
+    }
+
+    //if got updated, then update
+    if (Object.keys(updateData).length > 0) {
+      await supabaseAdmin
+        .from('songs')
+        .update(updateData)
+        .eq('id', songUuid)
+    }
+
     } else {
       // 创建新歌曲
+      
+      const insertData: any = {
+        song_id,
+        title,
+        artist,
+        album: album || '未知专辑',
+        cover_url: cover_url || null,
+        rank: rank || 'C',
+      }
+
+      // ✨ 添加扩展字段（清理空数组）
+      if (singers && singers.length > 0) insertData.singers = singers
+      if (lyricists && lyricists.length > 0) insertData.lyricists = lyricists
+      if (composers && composers.length > 0) insertData.composers = composers
+      if (producers && producers.length > 0) insertData.producers = producers
+      if (arrangers && arrangers.length > 0) insertData.arrangers = arrangers
+      if (mixing_engineers && mixing_engineers.length > 0) insertData.mixing_engineers = mixing_engineers
+      if (recording_engineers && recording_engineers.length > 0) insertData.recording_engineers = recording_engineers
+      if (album_id && album_id.trim()) insertData.album_id = album_id.trim()
+      if (genres && genres.length > 0) insertData.genres = genres
+
       const { data: newSong, error: insertError } = await supabaseAdmin
         .from('songs')
-        .insert({
-          song_id,
-          title,
-          artist,
-          album: album || '未知专辑',
-          cover_url: cover_url || null,
-          rank: rank || 'C',
-        })
+        .insert(insertData)
         .select('id')
         .single()
 
@@ -137,12 +226,19 @@ export async function POST(request: Request) {
     }
 
     // 2. 创建用户关联
+    const relationData: any ={
+      user_id: user.id,
+      song_id: songUuid,
+    }
+
+    // ✨ 添加负责人字段
+    if (supervisor && supervisor.trim()) {
+      relationData.supervisor = supervisor.trim()
+    }
+
     const { error: relationError } = await supabaseAdmin
       .from('user_song_relations')
-      .insert({
-        user_id: user.id,
-        song_id: songUuid,
-      })
+      .insert(relationData)
 
     if (relationError) {
       console.error('Error creating relation:', relationError)

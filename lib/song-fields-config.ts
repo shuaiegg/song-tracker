@@ -17,15 +17,15 @@ export interface SongFieldConfig {
 // song extention fields config
 
 export const SONG_EXTENDED_FIELDS: SongFieldConfig[] = [
-    {
-        key: 'singers',
-        label: '歌手',
-        type: 'array',
-        placeholder: '请输入歌手，多个歌手用逗号分隔',
-        required: false,
-        showInList: true,
-        searchable: true,
-    },
+    // {
+    //     key: 'singers',
+    //     label: '歌手',
+    //     type: 'array',
+    //     placeholder: '请输入歌手，多个歌手用逗号分隔',
+    //     required: false,
+    //     showInList: true,
+    //     searchable: true,
+    // },
     {
         key: 'lyricists',
         label: '作词',

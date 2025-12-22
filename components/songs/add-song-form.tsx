@@ -1,67 +1,95 @@
 // src/components/songs/add-song-form.tsx
+
 'use client'
 
 import { useState } from 'react'
 import { useFetchSong } from '@/hooks/use-fetch-song'
-import { ParsedSongInfo } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Music, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
-import { formatCount } from '@/lib/parse-douyin-data'
+import { Label } from '@/components/ui/label'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Loader2, Music, CheckCircle2 } from 'lucide-react'
+import { toast } from 'sonner'
+import { SongExtendedFields } from './song-extended-fields'  // ✨ 新增导入
+import { SongFormData, RankType } from '@/types'
 
-export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
+interface AddSongFormProps {
+  onSuccess?: () => void
+}
+
+export function AddSongForm({ onSuccess }: AddSongFormProps) {
   const [trackId, setTrackId] = useState('')
-  const [selectedRank, setSelectedRank] = useState<'A' | 'B' | 'C'>('C')
-  const [songPreview, setSongPreview] = useState<ParsedSongInfo | null>(null)
+  const [selectedRank, setSelectedRank] = useState<RankType>('C')
+  const [songPreview, setSongPreview] = useState<any>(null)
   const [step, setStep] = useState<'input' | 'preview' | 'success'>('input')
-  const [isSaving, setIsSaving] = useState(false)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const [isAdding, setIsAdding] = useState(false)
   
+  // ✨ 新增：扩展字段的状态
+  const [extendedFields, setExtendedFields] = useState<Partial<SongFormData>>({
+    // singers: [],
+    lyricists: [],
+    composers: [],
+    producers: [],
+    arrangers: [],
+    mixing_engineers: [],
+    recording_engineers: [],
+    // album_id: '',
+    genres: [],
+  })
+  const [supervisor, setSupervisor] = useState('')
+
   const { fetchSong, isLoading, error } = useFetchSong()
 
-  // 从 URL 提取 track_id
-  const extractTrackId = (input: string): string => {
-    // 如果是完整 URL
-    if (input.includes('track_id=')) {
-      const match = input.match(/track_id=([^&]+)/)
-      return match ? match[1] : input
-    }
-    // 如果只是 ID
-    return input.trim()
-  }
-
-  // 获取歌曲预览
+  // 步骤 1: 获取歌曲预览
   const handleFetchPreview = async () => {
-    if (!trackId.trim()) return
+    if (!trackId.trim()) {
+      toast.error('请输入歌曲 ID')
+      return
+    }
 
-    const id = extractTrackId(trackId)
-    const result = await fetchSong(id)
-
+    const result = await fetchSong(trackId.trim())
     if (result) {
       setSongPreview(result)
       setStep('preview')
     }
   }
 
-  // 确认添加歌曲
+  // ✨ 处理扩展字段变化
+  const handleExtendedFieldChange = (field: string, value: string | string[]) => {
+    setExtendedFields(prev => ({
+      ...prev,
+      [field]: value,
+    }))
+  }
+
+  // 步骤 2: 确认添加
   const handleConfirmAdd = async () => {
-    if (!songPreview) return
-
-    setIsSaving(true)
-    setSaveError(null)
-
+    setIsAdding(true)
+    
     try {
       const response = await fetch('/api/songs/add', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...songPreview,
+          // 基本信息
+          song_id: songPreview.song_id,
+          title: songPreview.title,
+          artist: songPreview.artist,
+          album_id: songPreview.album_id,
+          album: songPreview.album,
+          cover_url: songPreview.cover_url,
           rank: selectedRank,
+          // 统计数据
+          likes: songPreview.likes,
+          favorites: songPreview.favorites || 0,
+          comments: songPreview.comments,
+          shares: songPreview.shares,
+          // ✨ 扩展字段
+          ...extendedFields,
+          // ✨ 负责人（用户级别）
+          supervisor: supervisor.trim() || null,
         }),
       })
 
@@ -71,195 +99,181 @@ export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
         throw new Error(data.error || '添加失败')
       }
 
-      console.log('Song added successfully:', data)
+      toast.success('添加成功！')
       setStep('success')
-      
-      // 调用成功回调
-      if (onSuccess) {
-        onSuccess()
-      }
+      onSuccess?.()
 
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '添加失败'
-      setSaveError(message)
-      console.error('Error adding song:', err)
+    } catch (error: any) {
+      console.error('添加失败:', error)
+      toast.error(error.message || '添加失败，请重试')
     } finally {
-      setIsSaving(false)
+      setIsAdding(false)
     }
   }
 
   // 重置表单
   const handleReset = () => {
     setTrackId('')
-    setSongPreview(null)
-    setStep('input')
     setSelectedRank('C')
-    setSaveError(null)
+    setSongPreview(null)
+    setExtendedFields({
+    //   singers: [],
+      lyricists: [],
+      composers: [],
+      producers: [],
+      arrangers: [],
+      mixing_engineers: [],
+      recording_engineers: [],
+    //   album_id: '',
+      genres: [],
+    })
+    setSupervisor('')
+    setStep('input')
   }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Music className="h-5 w-5" />
-          添加歌曲
-        </CardTitle>
+        <CardTitle>添加歌曲追踪</CardTitle>
         <CardDescription>
-          输入歌曲 ID
+          输入抖音歌曲 ID，获取歌曲信息后添加到追踪列表
         </CardDescription>
       </CardHeader>
       <CardContent>
+        {/* 步骤 1: 输入歌曲 ID */}
         {step === 'input' && (
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="track-id">歌曲 ID</Label>
-              <Input
-                id="track-id"
-                placeholder="例如: 7565441743598209040 "
-                value={trackId}
-                onChange={(e) => setTrackId(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && trackId.trim() && !isLoading) {
-                    handleFetchPreview()
-                  }
-                }}
-                disabled={isLoading}
-              />
-              <p className="text-xs text-muted-foreground">
-                直接输入 track_id
-              </p>
+              <div className="flex gap-2">
+                <Input
+                  id="track-id"
+                  type="text"
+                  value={trackId}
+                  onChange={(e) => setTrackId(e.target.value)}
+                  placeholder="例如: 7234567890123456789"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleFetchPreview()
+                    }
+                  }}
+                  disabled={isLoading}
+                />
+                <Button
+                  onClick={handleFetchPreview}
+                  disabled={isLoading || !trackId.trim()}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      获取中
+                    </>
+                  ) : (
+                    <>
+                      <Music className="mr-2 h-4 w-4" />
+                      获取信息
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
             {error && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 rounded-lg text-sm">
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>{error}</div>
-              </div>
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-
-            <Button
-              onClick={handleFetchPreview}
-              disabled={!trackId.trim() || isLoading}
-              className="w-full"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  获取中...
-                </>
-              ) : (
-                '获取歌曲信息'
-              )}
-            </Button>
           </div>
         )}
 
+        {/* 步骤 2: 预览并填写扩展信息 */}
         {step === 'preview' && songPreview && (
-          <div className="space-y-4">
-            {/* 歌曲预览卡片 */}
-            <div className="border rounded-lg p-4 space-y-3">
+          <div className="space-y-6">
+            {/* 歌曲预览 */}
+            <div className="border rounded-lg p-4 bg-muted/50">
               <div className="flex items-start gap-4">
-                {songPreview.cover_url ? (
+                {songPreview.cover_url && (
                   <img
                     src={songPreview.cover_url}
                     alt={songPreview.title}
-                    className="w-20 h-20 rounded object-cover flex-shrink-0"
-                    onError={(e) => {
-                      // 图片加载失败时显示占位符
-                      e.currentTarget.style.display = 'none'
-                      e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                    }}
+                    className="w-20 h-20 rounded object-cover"
                   />
-                ) : null}
-                <div className={`w-20 h-20 rounded bg-muted flex items-center justify-center flex-shrink-0 ${songPreview.cover_url ? 'hidden' : ''}`}>
-                  <Music className="h-8 w-8 text-muted-foreground" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-lg truncate">
-                    {songPreview.title}
-                  </h3>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {songPreview.artist}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {songPreview.album}
-                  </p>
-                </div>
-              </div>
-
-              {/* 统计数据 */}
-              <div className="grid grid-cols-4 gap-2 pt-2 border-t">
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground">点赞</div>
-                  <div className="font-semibold">
-                    {formatCount(songPreview.likes)}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground">收藏</div>
-                  <div className="font-semibold">
-                    {formatCount(songPreview.favorites)}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground">评论</div>
-                  <div className="font-semibold">
-                    {formatCount(songPreview.comments)}
-                  </div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-muted-foreground">分享</div>
-                  <div className="font-semibold">
-                    {formatCount(songPreview.shares)}
+                )}
+                <div className="flex-1">
+                  <h3 className="font-semibold text-lg">Song: {songPreview.title}</h3>
+                  <p className="text-muted-foreground">Singers: {songPreview.artist}</p>
+                  <p className="text-sm text-muted-foreground">Album ID: {songPreview.album_id}</p>
+                  <p className="text-sm text-muted-foreground">Album: {songPreview.album}</p>
+                  
+                  <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">点赞: </span>
+                      <span className="font-medium">{songPreview.likes.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">评论: </span>
+                      <span className="font-medium">{songPreview.comments.toLocaleString()}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">分享: </span>
+                      <span className="font-medium">{songPreview.shares.toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Rank 选择 */}
+            {/* 追踪频率选择 */}
             <div className="space-y-2">
-              <Label htmlFor="rank">追踪频率</Label>
-              <Select value={selectedRank} onValueChange={(v) => setSelectedRank(v as any)}>
-                <SelectTrigger id="rank">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="A">Rank A - 每小时（热门歌曲）</SelectItem>
-                  <SelectItem value="B">Rank B - 每6小时（中热门）</SelectItem>
-                  <SelectItem value="C">Rank C - 每12小时（一般）</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Rank 决定数据抓取频率，可以随时修改
-              </p>
+              <Label>追踪频率 (Rank)</Label>
+              <RadioGroup value={selectedRank} onValueChange={(v) => setSelectedRank(v as RankType)}>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="A" id="rank-a" />
+                  <Label htmlFor="rank-a" className="font-normal cursor-pointer">
+                    Rank A - 每小时抓取
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="B" id="rank-b" />
+                  <Label htmlFor="rank-b" className="font-normal cursor-pointer">
+                    Rank B - 每 6 小时抓取
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="C" id="rank-c" />
+                  <Label htmlFor="rank-c" className="font-normal cursor-pointer">
+                    Rank C - 每 12 小时抓取
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
 
-            {saveError && (
-              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950 text-red-700 dark:text-red-300 rounded-lg text-sm">
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <div>{saveError}</div>
-              </div>
-            )}
+            {/* ✨ 扩展字段 */}
+            <SongExtendedFields
+              formData={extendedFields}
+              onChange={handleExtendedFieldChange}
+              supervisor={supervisor}
+              onSupervisorChange={setSupervisor}
+            />
 
             {/* 操作按钮 */}
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                onClick={handleReset} 
-                className="flex-1"
-                disabled={isSaving}
+              <Button
+                variant="outline"
+                onClick={() => setStep('input')}
+                disabled={isAdding}
               >
-                取消
+                返回
               </Button>
-              <Button 
-                onClick={handleConfirmAdd} 
+              <Button
+                onClick={handleConfirmAdd}
+                disabled={isAdding}
                 className="flex-1"
-                disabled={isSaving}
               >
-                {isSaving ? (
+                {isAdding ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    添加中...
+                    添加中
                   </>
                 ) : (
                   '确认添加'
@@ -269,20 +283,17 @@ export function AddSongForm({ onSuccess }: { onSuccess?: () => void }) {
           </div>
         )}
 
+        {/* 步骤 3: 成功 */}
         {step === 'success' && (
-          <div className="text-center py-8 space-y-4">
-            <div className="flex justify-center">
-              <div className="rounded-full bg-green-100 dark:bg-green-900 p-3">
-                <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
-              </div>
-            </div>
+          <div className="text-center space-y-4 py-8">
+            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto" />
             <div>
-              <h3 className="font-semibold text-lg mb-1">添加成功！</h3>
-              <p className="text-sm text-muted-foreground">
-                歌曲已开始追踪，系统将按照设定的频率自动抓取数据
+              <h3 className="text-lg font-semibold">添加成功！</h3>
+              <p className="text-muted-foreground mt-2">
+                歌曲已添加到追踪列表，系统将自动抓取数据
               </p>
             </div>
-            <Button onClick={handleReset} variant="outline">
+            <Button onClick={handleReset}>
               继续添加
             </Button>
           </div>
