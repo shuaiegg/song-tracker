@@ -11,7 +11,7 @@ import { SongsTable } from '@/components/songs/song-table';
 import { BatchStatsPanel } from '@/components/songs/batch-stats-panel';
 import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
 import { toast } from 'sonner';
-
+import { VirtualSongsTable } from '@/components/songs/virtual-songs-table' // ✨ 改用虚拟滚动表格
 
 interface SongWithStats {
     id: string
@@ -82,10 +82,12 @@ export default function SongsListPage() {
       if (filters.search) params.append('search', filters.search)
     //   if (filters.rank !== 'all') params.append('rank', filters.rank)
     //   if (filters.singers.length > 0) params.append('singers', filters.singers.join(','))
-      if (filters.lyricists.length > 0) params.append('lyricists', filters.lyricists.join(','))
-      if (filters.composers.length > 0) params.append('composers', filters.composers.join(','))
-      if (filters.producers.length > 0) params.append('producers', filters.producers.join(','))
-      if (filters.genres.length > 0) params.append('genres', filters.genres.join(','))
+
+      //to speed up,
+      // if (filters.lyricists.length > 0) params.append('lyricists', filters.lyricists.join(','))
+      // if (filters.composers.length > 0) params.append('composers', filters.composers.join(','))
+      // if (filters.producers.length > 0) params.append('producers', filters.producers.join(','))
+      // if (filters.genres.length > 0) params.append('genres', filters.genres.join(','))
       
       const response = await fetch(`/api/songs/advanced-list?${params.toString()}`)
 
@@ -167,13 +169,23 @@ export default function SongsListPage() {
             共 {songs.length} 首歌曲
             {selectedSongs.length > 0 && ` · 已选择 ${selectedSongs.length} 首`}
           </div>
+
           
-          <SongsTable
+          <VirtualSongsTable
+            songs={songs}
+            selectedSongs={selectedSongs}
+            onSelectionChange={setSelectedSongs}
+            />
+
+
+          {/* <SongsTable
             songs={songs}
             selectedSongs={selectedSongs}
             onSelectionChange={setSelectedSongs}
             onRefresh={fetchSongs}
-          />
+          /> */}
+
+          
         </>
       )}
     </div>

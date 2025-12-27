@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, use} from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Search, Filter, X} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,26 @@ import {
 import { TagInput } from '@/components/ui/tag-input';
 import { getSearchableFields } from '@/lib/song-fields-config';
 
+
+// add debounce 
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue ] = useState<T>(value)
+
+  useEffect(()=>{
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [value, delay])
+
+  return debouncedValue
+}
+
+
+
 export interface FilterValues {
     search: string;
     artist: string;
@@ -52,8 +72,24 @@ export function SongFilters({
     onFiltersChange,
     onApplyFilters
 }: SongFiltersProps) {
+
+    const [localSearch, setLocalSearch ] = useState(filters.search)
+
+    //set debounce 500ms
+    const debouncedSearch = useDebounce(localSearch, 500)
+
+
     const [suggestions, setSuggestions] = useState<Record<string,string[]>>({})
     const [isOpen, setIsOpen] = useState(false);
+
+
+     // ✨ 当防抖值变化时，自动搜索
+  useEffect(() => {
+    if (debouncedSearch !== filters.search) {
+      onFiltersChange({ ...filters, search: debouncedSearch })
+      onApplyFilters()
+    }
+  }, [debouncedSearch])
 
     //fetch suggestions for filterable fields
     useEffect(() => {
@@ -131,11 +167,12 @@ export function SongFilters({
             <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search  className="absolute left-3 top-1/2 - translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input 
+                  <Input 
                         type="text"
                         placeholder="搜索歌名或歌手..."
-                        value={filters.search}
-                        onChange={(e) => updateFilter('search', e.target.value)}
+                        value={localSearch}
+                        onChange={(e) => setLocalSearch(e.target.value)}    // ✨ 修改处理函数
+                        // onChange={(e) => updateFilter('search', e.target.value)}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter') {
                                 onApplyFilters();
