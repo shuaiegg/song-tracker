@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "app/api/songs/advanced-list/route_bk.ts"  ],
   "exclude": ["node_modules", "supabase/functions"]
 }

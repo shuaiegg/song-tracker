@@ -9,6 +9,7 @@ import { Music, TrendingUp, Users, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AddSongForm } from '@/components/songs/add-song-form-bk'
 import { SongList } from '@/components/songs/song-list'
+import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
 import { TriggerFetch } from '@/components/admin/trigger-fetch'
 
 

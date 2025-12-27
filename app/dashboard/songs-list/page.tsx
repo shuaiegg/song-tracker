@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { SongFilters, FilterValues } from '@/components/songs/song-filters';
 import { SongsTable } from '@/components/songs/song-table';
 import { BatchStatsPanel } from '@/components/songs/batch-stats-panel';
+import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
 import { toast } from 'sonner';
 
 
@@ -87,7 +88,7 @@ export default function SongsListPage() {
       if (filters.genres.length > 0) params.append('genres', filters.genres.join(','))
       
       const response = await fetch(`/api/songs/advanced-list?${params.toString()}`)
-      
+
       if (!response.ok) {
         throw new Error('获取失败')
       }
@@ -132,11 +133,15 @@ export default function SongsListPage() {
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* 页面标题 */}
-      <div>
+      <div className="flex items-center justify-between">
+        <div>
         <h1 className="text-3xl font-bold">歌曲列表</h1>
         <p className="text-muted-foreground mt-2">
           搜索、筛选和管理你追踪的所有歌曲
         </p>
+        </div>
+        {/* ✨ 添加批量上传按钮 */}
+        <BatchUploadDialog onSuccess={fetchSongs} />
       </div>
       
       {/* 筛选器 */}
