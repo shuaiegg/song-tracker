@@ -53,6 +53,21 @@ The app uses a **hybrid authentication approach** to work around unreliable `onA
   - Used throughout app for authorization checks
   - Admin status checked via `/api/auth/is-admin` after user authenticated
 
+- **Data Fetching & Caching**: React Query (`@tanstack/react-query`)
+  - **Provider**: `QueryProvider` in `app/layout.tsx` wraps entire app
+  - **Configuration**: 5min staleTime, 10min gcTime, auto-retry on failure
+  - **Usage Pattern**: All client-side data fetching should use `useQuery`
+  - **Cache Invalidation**: Use `queryClient.invalidateQueries()` after mutations
+  - **Example**:
+    ```tsx
+    const { data, isLoading } = useQuery({
+      queryKey: ['my-songs', user?.id],
+      queryFn: () => fetch('/api/songs/my-songs').then(r => r.json()),
+      enabled: !!user,
+      staleTime: 5 * 60 * 1000,
+    })
+    ```
+
 - **Server Components**: Use `createClient()` from `@/lib/supabase/server` for database queries
 - **Client Components**: Use `createClient()` from `@/lib/supabase/client` for auth state and real-time features
 
@@ -146,7 +161,42 @@ When adding/modifying extended song fields:
 
 - **Song List**: Uses `@tanstack/react-virtual` for virtualizing large datasets (500+ songs)
 - **API Queries**: Advanced list endpoint (`/api/songs/advanced-list/route.ts`) uses Supabase's `!inner` join syntax to filter efficiently
-- **Caching**: Uses `@tanstack/react-query` for client-side data caching
+- **Caching**: Uses `@tanstack/react-query` for client-side data caching (5min stale, 10min GC)
+
+**Avoiding N+1 Queries (CRITICAL):**
+
+When fetching songs with their latest stats, always use nested queries instead of loops:
+
+```typescript
+// ❌ BAD: N+1 queries (1 + N database calls)
+const songs = await supabase.from('songs').select('*')
+for (const song of songs) {
+  const stats = await supabase.from('song_stats').select('*').eq('song_id', song.id)
+}
+
+// ✅ GOOD: Single query with nested relations
+const { data } = await supabase
+  .from('user_song_relations')
+  .select(`
+    songs!inner (
+      *,
+      song_stats (likes, comments, shares, fetched_at)
+    )
+  `)
+  .eq('user_id', user.id)
+  .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
+
+// Get latest stats per song (first in array due to ordering)
+const songsWithStats = data.map(rel => ({
+  ...rel.songs,
+  latest_stats: rel.songs.song_stats?.[0] || defaultStats
+}))
+```
+
+**API Pagination:**
+- Default limit should be small (10-50) to reduce initial load time
+- Use `?page=1&limit=10` parameters for pagination
+- Return `total`, `page`, `limit`, `totalPages` for client-side pagination UI
 
 ### Supabase Configuration
 
@@ -172,7 +222,10 @@ Admins can manually trigger data fetches:
 ## Common Gotchas
 
 1. **Auth State Race Conditions**: Always use imperative state updates after login/signup server actions (see TROUBLESHOOTING_AUTH.md)
-2. **Array Field Parsing**: Extended fields stored as PostgreSQL arrays - use `.split(',')` when uploading from Excel
-3. **Rank Changes**: Updating song rank requires updating `user_song_relations.rank`, which affects future fetch schedules
-4. **Edge Function CORS**: All edge functions must include CORS headers for preflight requests
-5. **Chinese Characters**: UI is in Chinese (Simplified) - song titles, artist names, and labels use Chinese text
+2. **N+1 Query Performance**: NEVER loop through results to fetch related data. Always use Supabase nested queries with proper ordering (see Performance Considerations)
+3. **React Query Cache**: After mutations (add/delete/update), call `queryClient.invalidateQueries()` to refresh affected data. Don't manually refetch.
+4. **Array Field Parsing**: Extended fields stored as PostgreSQL arrays - use `.split(',')` when uploading from Excel
+5. **Rank Changes**: Updating song rank requires updating `user_song_relations.rank`, which affects future fetch schedules
+6. **Edge Function CORS**: All edge functions must include CORS headers for preflight requests
+7. **API Pagination**: Always set reasonable default limits (10-50) in API endpoints to avoid loading thousands of records
+8. **Chinese Characters**: UI is in Chinese (Simplified) - song titles, artist names, and labels use Chinese text
