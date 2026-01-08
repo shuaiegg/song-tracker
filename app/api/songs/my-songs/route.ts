@@ -77,19 +77,20 @@ export async function GET(request: Request) {
         song_stats: undefined, // 移除原始数组，避免传输过多数据
       }))
 
-    // 🚀 获取所有歌曲的总点赞数统计（不限于前 10 首）
+    // ✨ 优化：获取所有歌曲的总点赞数统计，限制每首歌只返回最新的一条
     const { data: allStats } = await supabase
       .from('user_song_relations')
       .select(`
         songs!inner (
           id,
-          song_stats!inner (
+          song_stats (
             likes
           )
         )
       `)
       .eq('user_id', user.id)
       .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
+      .limit(1, { referencedTable: 'songs.song_stats' }) // ✨ 每首歌只返回最新的一条
 
     // 计算总点赞数：取每首歌的最新统计记录的点赞数
     const songStatsMap = new Map<string, number>()

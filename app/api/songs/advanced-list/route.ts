@@ -32,6 +32,8 @@ export async function GET(request: Request) {
          * 1. 核心查询：从关联表出发
          * 使用 !inner 强制要求必须匹配到歌曲（Inner Join）
          * 这样即便 songIds 有几万个，也不会写在 URL 里，而是由数据库内部处理
+         *
+         * ✨ 优化：只查询最新的 song_stats（使用 ...limit(1)）
          */
         let query = supabase
             .from('user_song_relations')
@@ -56,19 +58,28 @@ export async function GET(request: Request) {
         }
 
         // 3. 执行查询
-        // 注意：我们让 song_stats 按时间倒序排，这样我们取第一条就是最新的
-        // 3. 执行查询
-const { data: rawRelations, error } = await query
-    // 第一：对主表 user_song_relations 进行排序（该表有 created_at）
-    .order('created_at', { ascending: false }) 
-    
-    // 第二：对关联的 songs 表进行排序（假设 songs 表也有 created_at，如果没有，请换成 id）
-    .order('created_at', { referencedTable: 'songs', ascending: false })
-    
-    // 第三：关键修正！对 song_stats 进行排序（必须使用 fetched_at）
-    .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false });
+        // ✨ 优化：限制 song_stats 只返回最新的一条（使用 ...limit(1) 语法）
+        const { data: rawRelations, error } = await query
+            // 第一：对主表 user_song_relations 进行排序（该表有 created_at）
+            .order('created_at', { ascending: false })
 
-if (error) throw error;
+            // 第二：对关联的 songs 表进行排序
+            .order('created_at', { referencedTable: 'songs', ascending: false })
+
+            // 第三：对 song_stats 进行排序（必须使用 fetched_at）
+            .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
+
+            // ✨ 限制每首歌只返回最新的一条 stats
+            .limit(1, { referencedTable: 'songs.song_stats' });
+
+        if (error) {
+            console.error('Supabase query error:', error);
+            throw error;
+        }
+
+        if (!rawRelations) {
+            return NextResponse.json({ songs: [], total: 0 });
+        }
 
         /**
          * 4. 数据清洗与高级过滤 (在内存中处理)

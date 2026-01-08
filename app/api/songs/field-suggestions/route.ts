@@ -44,30 +44,25 @@ export async function GET(request:Request) {
             return NextResponse.json({ error: '不支持的字段参数' }, { status: 400 });
         }
 
-        //query distinct values for the field from songs table for the current user
+        // ✨ 优化：使用嵌套查询一次性获取数据
+        const { data: relations, error } = await supabase
+            .from('user_song_relations')
+            .select(`songs!inner(${field})`)
+            .eq('user_id', user.id);
 
-        const { data: userSongs} = await supabase
-            .from('songs')
-            .select(`${field}`)
-            .eq('user_id', user.id)
-            .not(`${field}`, 'is', null)
-        
-        if(!userSongs || userSongs.length === 0 ){
+        if (error) {
+            console.error('Error fetching field suggestions:', error);
             return NextResponse.json({ field, values: [] });
         }
 
-        const songIds = (userSongs as any[]).map(r => r.song_id);
-
-        //extract distinct values from the field
-        const { data: songs} = await supabase
-            .from('songs')
-            .select(field)
-            .in('song_id', songIds)
-            .not(field, 'is', null)
-
-        if(!songs) {
+        if (!relations || relations.length === 0) {
             return NextResponse.json({ field, values: [] });
         }
+
+        // 从嵌套结果中提取歌曲数据
+        const songs = relations
+            .map((rel: any) => rel.songs)
+            .filter((song: any) => song && song[field] != null);
 
         //shuzu qu chong
         const allValues = new Set<string>();

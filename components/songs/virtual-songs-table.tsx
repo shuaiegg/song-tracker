@@ -83,6 +83,9 @@ export function VirtualSongsTable({
     )
   }
 
+  // 防止 hydration 错误：确保复选框状态在客户端渲染时一致
+  const checkboxChecked = isAllSelected ? true : (isSomeSelected ? 'indeterminate' : false)
+
   return (
     <div className="border rounded-lg overflow-hidden">
       {/* 表头（固定） */}
@@ -90,16 +93,16 @@ export function VirtualSongsTable({
         <div className="flex items-center px-4 py-3 gap-4 text-sm font-medium">
           <div className="w-[50px]">
             <Checkbox
-              checked={isAllSelected}
+              checked={checkboxChecked}
               onCheckedChange={handleSelectAll}
               aria-label="全选"
             />
           </div>
           <div className="w-[80px]">封面</div>
-          <div className="flex-1">歌曲信息</div>
-          <div className="w-[200px]">扩展信息</div>
+          <div className="w-[200px]">歌曲信息</div>
+          <div className="flex-1">扩展信息</div>
           <div className="w-[150px]">统计数据</div>
-          <div className="w-[80px]">Rank</div>
+          <div className="w-[50px]">Rank</div>
           <div className="w-[100px]">负责人</div>
           <div className="w-[80px] text-right">操作</div>
         </div>
@@ -161,7 +164,7 @@ export function VirtualSongsTable({
                   </div>
 
                   {/* 歌曲信息 */}
-                  <div className="flex-1 min-w-0">
+                  <div className="w-[200px] min-w-0">
                     <Link
                       href={`/dashboard/songs/${song.id}`}
                       className="font-medium hover:underline truncate block"
@@ -172,18 +175,47 @@ export function VirtualSongsTable({
                   </div>
 
                   {/* 扩展信息 */}
-                  <div className="w-[200px]">
+                  <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap gap-1">
-                      {song.singers?.slice(0, 2).map((singer, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
-                          {singer}
-                        </Badge>
-                      ))}
-                      {(song.singers?.length || 0) > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{song.singers!.length - 2}
-                        </Badge>
-                      )}
+                      {(() => {
+                        const allTags: Array<{ label: string; value: string }> = []
+
+                        // 定义所有扩展信息字段及其中文标签
+                        const extendedFields = [
+                          { key: 'album', label: '专辑', isString: true },
+                          { key: 'lyricists', label: '作词' },
+                          { key: 'composers', label: '作曲' },
+                          { key: 'arrangers', label: '编曲' },
+                          { key: 'producers', label: '制作人' },
+                          { key: 'genres', label: '风格' },
+                          { key: 'mixing_engineers', label: '混音' },
+                          { key: 'recording_engineers', label: '录音' },
+                        ]
+
+                        // 收集所有扩展信息字段的值
+                        extendedFields.forEach(field => {
+                          const values = (song as any)[field.key]
+                          if (field.isString && values) {
+                            // 字符串类型字段（如 album）
+                            allTags.push({ label: field.label, value: values })
+                          } else if (Array.isArray(values) && values.length > 0) {
+                            // 数组类型字段
+                            values.forEach(value => {
+                              allTags.push({ label: field.label, value })
+                            })
+                          }
+                        })
+
+                        return (
+                          <>
+                            {allTags.map((tag, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {tag.label}: {tag.value}
+                              </Badge>
+                            ))}
+                          </>
+                        )
+                      })()}
                     </div>
                   </div>
 
@@ -200,8 +232,8 @@ export function VirtualSongsTable({
                   </div>
 
                   {/* Rank */}
-                  <div className="w-[80px]">
-                    <Badge variant={song.rank === 'A' ? 'default' : 'outline'}>
+                  <div className="w-[50px]">
+                    <Badge variant={song.rank === 'A' ? 'default' : 'outline'} className="text-xs">
                       {song.rank}
                     </Badge>
                   </div>

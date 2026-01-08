@@ -6,13 +6,19 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth-store'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { setUser, setIsAdmin, setIsLoading, reset, setIsAdminLoading } = useAuthStore()
+  const { setUser, setIsAdmin, setIsLoading, reset, setIsAdminLoading, isInitialized, setIsInitialized } = useAuthStore()
 
   useEffect(() => {
     const supabase = createClient()
 
-    // 检查管理员状态
-    const checkAdmin = async (userId: string) => {
+    // 检查管理员状态（带缓存）
+    const checkAdmin = async (userId: string, forceRefresh = false) => {
+      // ✨ 如果已初始化且不强制刷新，跳过 API 调用
+      if (isInitialized && !forceRefresh) {
+        setIsAdminLoading(false)
+        return
+      }
+
       setIsAdminLoading(true)
       try {
         const response = await fetch('/api/auth/is-admin')
@@ -39,7 +45,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 🚀 初始化：立即检查当前会话
     const initializeAuth = async () => {
-      setIsLoading(true)
+      // ✨ 如果已经初始化过，只在必要时显示 loading
+      if (!isInitialized) {
+        setIsLoading(true)
+      }
+
       try {
         const { data: { session } } = await supabase.auth.getSession()
         const currentUser = session?.user
@@ -55,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         reset()
       } finally {
         setIsLoading(false)
+        setIsInitialized(true) // ✨ 标记已完成初始化
       }
     }
 
@@ -63,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setIsLoading(true)
 
         const currentUser = session?.user
@@ -82,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [isInitialized])
 
   return <>{children}</>
 }

@@ -4,14 +4,14 @@
 
 import {useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth-store';
-import { Loader2 } from 'lucide-react';
 import { SongFilters, FilterValues } from '@/components/songs/song-filters';
-import { SongsTable } from '@/components/songs/song-table';
 import { BatchStatsPanel } from '@/components/songs/batch-stats-panel';
 import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
 import { toast } from 'sonner';
 import { VirtualSongsTable } from '@/components/songs/virtual-songs-table' // ✨ 改用虚拟滚动表格
+import { VirtualSongsTableSkeleton } from '@/components/songs/virtual-songs-table-skeleton'
 
 interface SongWithStats {
     id: string
@@ -42,11 +42,9 @@ interface SongWithStats {
 }
 
 export default function SongsListPage() {
-  const { user, isLoading: authLoading } = useAuthStore()
+  const { user, isLoading: authLoading, isInitialized } = useAuthStore()
   const router = useRouter()
-  
-  const [songs, setSongs] = useState<SongWithStats[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+
   const [selectedSongs, setSelectedSongs] = useState<string[]>([])
   
   // 筛选条件
@@ -70,68 +68,79 @@ export default function SongsListPage() {
       router.push('/login')
     }
   }, [user, authLoading, router])
-  
-  // 获取歌曲列表
-  const fetchSongs = async () => {
-    setIsLoading(true)
-    
-    try {
+
+  // ✨ 使用 React Query 缓存歌曲列表
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['songs-list', filters],
+    queryFn: async () => {
       // 构建查询参数
       const params = new URLSearchParams()
-      
-      if (filters.search) params.append('search', filters.search)
-    //   if (filters.rank !== 'all') params.append('rank', filters.rank)
-    //   if (filters.singers.length > 0) params.append('singers', filters.singers.join(','))
 
-      //to speed up,
-      // if (filters.lyricists.length > 0) params.append('lyricists', filters.lyricists.join(','))
-      // if (filters.composers.length > 0) params.append('composers', filters.composers.join(','))
-      // if (filters.producers.length > 0) params.append('producers', filters.producers.join(','))
-      // if (filters.genres.length > 0) params.append('genres', filters.genres.join(','))
-      
+      if (filters.search) params.append('search', filters.search)
+      if (filters.artist) params.append('artist', filters.artist)
+      if (filters.album) params.append('album', filters.album)
+      if (filters.rank !== 'all') params.append('rank', filters.rank)
+
+      // 数组类筛选参数
+      if (filters.lyricists.length > 0) params.append('lyricists', filters.lyricists.join(','))
+      if (filters.composers.length > 0) params.append('composers', filters.composers.join(','))
+      if (filters.producers.length > 0) params.append('producers', filters.producers.join(','))
+      if (filters.genres.length > 0) params.append('genres', filters.genres.join(','))
+      if (filters.mixing_engineers.length > 0) params.append('mixing_engineers', filters.mixing_engineers.join(','))
+      if (filters.recording_engineers.length > 0) params.append('recording_engineers', filters.recording_engineers.join(','))
+
       const response = await fetch(`/api/songs/advanced-list?${params.toString()}`)
 
       if (!response.ok) {
         throw new Error('获取失败')
       }
-      
-      const data = await response.json()
-      setSongs(data.songs || [])
-      
-      // 清空选择（因为列表变了）
-      setSelectedSongs([])
-      
-    } catch (error) {
-      console.error('获取歌曲列表失败:', error)
-      toast.error('获取歌曲列表失败')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-  
-  // 初始加载
-  useEffect(() => {
-    if (user) {
-      fetchSongs()
-    }
-  }, [user])
-  
-  // 应用筛选
+
+      const result = await response.json()
+      return result.songs || []
+    },
+    enabled: !!user,
+    staleTime: 2 * 60 * 1000, // 2 分钟
+    gcTime: 10 * 60 * 1000, // 10 分钟
+  })
+
+  const songs = data || []
+
+  // 应用筛选后清空选择
   const handleApplyFilters = () => {
-    fetchSongs()
+    setSelectedSongs([])
+    refetch()
   }
-  
+
   // 获取选中的歌曲完整信息
   const selectedSongsData = songs.filter(song => selectedSongs.includes(song.id))
-  
-  if (authLoading || !user) {
+
+  // ✨ 优化：只在首次初始化时显示骨架屏，刷新时直接显示上次的内容
+  if ((authLoading && !isInitialized) || !user) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="container mx-auto py-6 space-y-6">
+        {/* 页面标题骨架 */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-9 w-32 bg-muted animate-pulse rounded" />
+            <div className="h-5 w-64 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+
+        {/* 筛选器骨架 */}
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            <div className="flex-1 h-10 bg-muted animate-pulse rounded" />
+            <div className="h-10 w-20 bg-muted animate-pulse rounded" />
+            <div className="h-10 w-20 bg-muted animate-pulse rounded" />
+          </div>
+        </div>
+
+        {/* 表格骨架 */}
+        <VirtualSongsTableSkeleton />
       </div>
     )
   }
-  
+
   return (
     <div className="container mx-auto py-6 space-y-6">
       {/* 页面标题 */}
@@ -143,26 +152,24 @@ export default function SongsListPage() {
         </p>
         </div>
         {/* ✨ 添加批量上传按钮 */}
-        <BatchUploadDialog onSuccess={fetchSongs} />
+        <BatchUploadDialog onSuccess={() => refetch()} />
       </div>
-      
+
       {/* 筛选器 */}
       <SongFilters
         filters={filters}
         onFiltersChange={setFilters}
         onApplyFilters={handleApplyFilters}
       />
-      
+
       {/* 批量统计面板 */}
       {selectedSongs.length > 0 && (
         <BatchStatsPanel selectedSongs={selectedSongsData} />
       )}
-      
+
       {/* 歌曲表格 */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+        <VirtualSongsTableSkeleton />
       ) : (
         <>
           <div className="text-sm text-muted-foreground">

@@ -15,7 +15,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user, isAdmin, isLoading } = useAuthStore()
+  const { user, isAdmin, isLoading, isInitialized } = useAuthStore()
   const router = useRouter()
   const pathname = usePathname() //get current path
 
@@ -44,8 +44,8 @@ export default function DashboardLayout({
     },
   ]
 
-  // 🚀 加载状态：显示一致的 loading UI
-  if (isLoading) {
+  // ✨ 优化：只在首次初始化时显示 loading，后续刷新使用持久化的数据
+  if (isLoading && !isInitialized) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
         <div className="text-center">

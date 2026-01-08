@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, X} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,6 @@ import {
 } from '@/components/ui/select';
 
 import { TagInput } from '@/components/ui/tag-input';
-import { getSearchableFields } from '@/lib/song-fields-config';
 
 
 // add debounce 
@@ -79,7 +79,20 @@ export function SongFilters({
     const debouncedSearch = useDebounce(localSearch, 500)
 
 
-    const [suggestions, setSuggestions] = useState<Record<string,string[]>>({})
+    // ✨ 使用 React Query 缓存字段建议
+    const { data: suggestions = {} } = useQuery<Record<string, string[]>>({
+        queryKey: ['field-suggestions-batch'],
+        queryFn: async () => {
+            const response = await fetch('/api/songs/field-suggestions-batch');
+            if (!response.ok) {
+                throw new Error('Failed to fetch suggestions');
+            }
+            return response.json();
+        },
+        staleTime: 10 * 60 * 1000, // 10 分钟
+        gcTime: 30 * 60 * 1000, // 30 分钟
+        retry: 1,
+    })
     const [isOpen, setIsOpen] = useState(false);
 
 
@@ -91,36 +104,6 @@ export function SongFilters({
     }
   }, [debouncedSearch])
 
-    //fetch suggestions for filterable fields
-    useEffect(() => {
-        const fetchSuggestions = async () => {
-            const fields = getSearchableFields();
-
-            try {
-                const results = await Promise.all(
-                    fields.map( async (field) => {
-                        const response = await fetch(`/api/songs/field-suggestions?field=${field.key}`)
-                        if(response.ok) {
-                            const data = await response.json();
-                            return { field: field.key, values: data.values}
-                        }
-                        return { field: field.key, values: []}
-                    })
-                )
-                
-                const suggestionsMap: Record<string, string[]> = {};
-                results.forEach(({field, values}) => {
-                    suggestionsMap[field] = values
-                })
-
-                setSuggestions(suggestionsMap);
-            } catch (error) {
-                console.log('Error fetching filter suggestions:', error)
-            }
-        }
-        fetchSuggestions();
-    }, [])
-
     //update single filter option
     const updateFilter = (key: keyof FilterValues, value: any) => {
         onFiltersChange({
@@ -131,6 +114,7 @@ export function SongFilters({
 
     //clear filter options
     const clearAllFilters = () => {
+        setLocalSearch('')  // 清空本地搜索框
         onFiltersChange({
             search: '',
             artist: '',
@@ -148,18 +132,17 @@ export function SongFilters({
 
     // calculate active filters count
     const activeFiltersCount = [
-        filters.search,
-        ...filters.artist,
-        ...filters.album,
-        ...filters.lyricists,
-        ...filters.composers,
-        ...filters.producers,
-        ...filters.genres,
-        ...filters.producers,
-        ...filters.mixing_engineers,
-        ...filters.recording_engineers,
-        filters.rank !== 'all' ? filters.rank : null,
-    ].filter(Boolean).length;
+        filters.search ? 1 : 0,
+        filters.artist ? 1 : 0,
+        filters.album ? 1 : 0,
+        filters.lyricists.length,
+        filters.composers.length,
+        filters.producers.length,
+        filters.genres.length,
+        filters.mixing_engineers.length,
+        filters.recording_engineers.length,
+        filters.rank !== 'all' ? 1 : 0,
+    ].reduce((sum, count) => sum + count, 0);
 
     return (
         <div className="space-y-4">
@@ -269,9 +252,27 @@ export function SongFilters({
                 />
               </div>
 
-            
+              {/* 混音工程师 */}
+              <div className="space-y-2">
+                <Label>混音工程师</Label>
+                <TagInput
+                  value={filters.mixing_engineers}
+                  onChange={(tags) => updateFilter('mixing_engineers', tags)}
+                  placeholder="选择或输入混音工程师"
+                  suggestions={suggestions.mixing_engineers || []}
+                />
+              </div>
 
-                {/* 混音工程师 */}
+              {/* 录音工程师 */}
+              <div className="space-y-2">
+                <Label>录音工程师</Label>
+                <TagInput
+                  value={filters.recording_engineers}
+                  onChange={(tags) => updateFilter('recording_engineers', tags)}
+                  placeholder="选择或输入录音工程师"
+                  suggestions={suggestions.recording_engineers || []}
+                />
+              </div>
 
 
                 {/* Buttons */}
@@ -386,7 +387,37 @@ export function SongFilters({
               </button>
             </Badge>
           ))}
-          
+
+          {filters.mixing_engineers.map((engineer, i) => (
+            <Badge key={`mixing-${i}`} variant="secondary">
+              混音: {engineer}
+              <button
+                onClick={() => {
+                  updateFilter('mixing_engineers', filters.mixing_engineers.filter((_, idx) => idx !== i))
+                  onApplyFilters()
+                }}
+                className="ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+
+          {filters.recording_engineers.map((engineer, i) => (
+            <Badge key={`recording-${i}`} variant="secondary">
+              录音: {engineer}
+              <button
+                onClick={() => {
+                  updateFilter('recording_engineers', filters.recording_engineers.filter((_, idx) => idx !== i))
+                  onApplyFilters()
+                }}
+                className="ml-1"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+
           <Button
             variant="ghost"
             size="sm"
