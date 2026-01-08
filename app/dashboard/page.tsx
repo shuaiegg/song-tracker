@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/auth-store'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Music, TrendingUp, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AddSongForm } from '@/components/songs/add-song-form-bk'
@@ -85,10 +86,19 @@ export default function DashboardPage() {
             <Music className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loadingStats ? '--' : stats.totalSongs}</div>
-            <p className="text-xs text-muted-foreground">
-              {stats.totalSongs === 0 ? '暂无追踪的歌曲' : '正在追踪中'}
-            </p>
+            {loadingStats ? (
+              <>
+                <Skeleton className="h-8 w-20 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.totalSongs}</div>
+                <p className="text-xs text-muted-foreground">
+                  {stats.totalSongs === 0 ? '暂无追踪的歌曲' : '正在追踪中'}
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -98,8 +108,17 @@ export default function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{loadingStats ? '--' : stats.totalLikes.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">所有歌曲累计点赞</p>
+            {loadingStats ? (
+              <>
+                <Skeleton className="h-8 w-28 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{stats.totalLikes.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">所有歌曲累计点赞</p>
+              </>
+            )}
           </CardContent>
         </Card>
 

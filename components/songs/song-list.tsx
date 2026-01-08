@@ -102,9 +102,9 @@ export function SongList() {
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle>我的歌曲 ({songs.length})</CardTitle>
+          <CardTitle>最近添加的歌曲 ({songs.length})</CardTitle>
           <CardDescription>
-            正在追踪 {songs.length} 首歌曲的数据变化
+            最近 {songs.length} 首歌曲的数据变化
           </CardDescription>
         </CardHeader>
       </Card>
