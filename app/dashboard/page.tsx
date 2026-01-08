@@ -30,6 +30,10 @@ interface MySongsResponse {
   total: number
   page: number
   limit: number
+  summary: {
+    totalLikes: number
+    totalSongs: number
+  }
 }
 
 // 🚀 提取 fetch 函数，便于复用和测试
@@ -54,13 +58,11 @@ export default function DashboardPage() {
     staleTime: 5 * 60 * 1000, // 5分钟内认为数据新鲜
   })
 
-  // 计算统计数据
+  // 计算统计数据 - 使用 API 返回的真实总计
   const stats: DashboardStats = {
-    totalSongs: data?.total || 0, // 使用 total 字段获取真实总数
+    totalSongs: data?.summary.totalSongs || 0,
     todayGrowth: 0,
-    totalLikes: data?.songs.reduce((sum, song) =>
-      sum + (song.latest_stats?.likes || 0), 0
-    ) || 0,
+    totalLikes: data?.summary.totalLikes || 0, // 🚀 使用所有歌曲的真实总点赞数
   }
 
   // 🚀 添加歌曲成功后，刷新数据

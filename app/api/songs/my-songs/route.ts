@@ -77,12 +77,43 @@ export async function GET(request: Request) {
         song_stats: undefined, // 移除原始数组，避免传输过多数据
       }))
 
+    // 🚀 获取所有歌曲的总点赞数统计（不限于前 10 首）
+    const { data: allStats } = await supabase
+      .from('user_song_relations')
+      .select(`
+        songs!inner (
+          id,
+          song_stats!inner (
+            likes
+          )
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
+
+    // 计算总点赞数：取每首歌的最新统计记录的点赞数
+    const songStatsMap = new Map<string, number>()
+    allStats?.forEach((rel: any) => {
+      const songId = rel.songs.id
+      const likes = rel.songs.song_stats?.[0]?.likes || 0
+      // 只保留每首歌的第一条记录（最新的）
+      if (!songStatsMap.has(songId)) {
+        songStatsMap.set(songId, likes)
+      }
+    })
+
+    const totalLikes = Array.from(songStatsMap.values()).reduce((sum, likes) => sum + likes, 0)
+
     return NextResponse.json({
       songs: songsWithStats,
       total: count,
       page,
       limit,
       totalPages: Math.ceil((count || 0) / limit),
+      summary: {
+        totalLikes,
+        totalSongs: count,
+      },
     })
 
   } catch (error) {
