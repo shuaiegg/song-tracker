@@ -112,7 +112,7 @@ export default function SongsListPage() {
   }
 
   // 获取选中的歌曲完整信息
-  const selectedSongsData = songs.filter(song => selectedSongs.includes(song.id))
+  const selectedSongsData = songs.filter((song: { id: string; }) => selectedSongs.includes(song.id))
 
   // ✨ 优化：只在首次初始化时显示骨架屏，刷新时直接显示上次的内容
   if ((authLoading && !isInitialized) || !user) {
