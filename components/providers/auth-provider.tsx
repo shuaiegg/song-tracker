@@ -37,20 +37,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    // 🚀 初始化：立即检查当前会话
+    const initializeAuth = async () => {
+      setIsLoading(true)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const currentUser = session?.user
+
+        if (currentUser) {
+          setUser(currentUser)
+          await checkAdmin(currentUser.id)
+        } else {
+          reset()
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+        reset()
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    // 立即执行初始化
+    initializeAuth()
+
     // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setIsLoading(true)
 
         const currentUser = session?.user
-        
+
         if (currentUser) {
           setUser(currentUser)
           await checkAdmin(currentUser.id)
         } else {
           reset() // 用户登出或session失效时重置整个auth状态
         }
-        
+
         setIsLoading(false)
       }
     )

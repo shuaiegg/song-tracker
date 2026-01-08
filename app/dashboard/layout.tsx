@@ -1,7 +1,7 @@
 // src/app/dashboard/layout.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { useAuthStore } from '@/store/auth-store'
@@ -18,18 +18,13 @@ export default function DashboardLayout({
   const { user, isAdmin, isLoading } = useAuthStore()
   const router = useRouter()
   const pathname = usePathname() //get current path
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // 基础权限校验
   useEffect(() => {
-    if (mounted && !isLoading && !user) {
+    if (!isLoading && !user) {
       router.push('/login')
     }
-  }, [user, isLoading, router, mounted])
+  }, [user, isLoading, router])
 
   const handleLogout = async () => {
     await logout()
@@ -49,14 +44,19 @@ export default function DashboardLayout({
     },
   ]
 
-  if (!mounted || isLoading) {
+  // 🚀 加载状态：显示一致的 loading UI
+  if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">加载中...</p>
+        </div>
       </div>
     )
   }
 
+  // 未登录：返回 null（会被 useEffect 重定向到登录页）
   if (!user) return null
 
   return (
