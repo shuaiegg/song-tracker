@@ -7,16 +7,15 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '1000')
+  const limit = parseInt(searchParams.get('limit') || '10') // 默认改为10，大幅减少数据量
   const offset = (page - 1) * limit
-
 
   try {
     const supabase = await createClient()
-    
+
     // 获取当前用户
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
       return NextResponse.json(
         { error: '未登录' },
@@ -24,14 +23,14 @@ export async function GET(request: Request) {
       )
     }
 
-    // 查询用户关注的歌曲
+    // 🚀 优化：使用单次查询获取歌曲和最新统计数据，避免 N+1 问题
     const { data: relations, error: relationsError, count } = await supabase
       .from('user_song_relations')
       .select(`
         id,
         created_at,
         song_id,
-        songs (
+        songs!inner (
           id,
           song_id,
           title,
@@ -39,11 +38,19 @@ export async function GET(request: Request) {
           album,
           cover_url,
           rank,
-          created_at
+          created_at,
+          song_stats (
+            likes,
+            favorites,
+            comments,
+            shares,
+            fetched_at
+          )
         )
       `, { count: 'exact' })
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
+      .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
       .range(offset, offset + limit - 1)
 
     if (relationsError) {
@@ -54,41 +61,28 @@ export async function GET(request: Request) {
       )
     }
 
-    // 提取歌曲数据
-    const songs = relations
+    // 提取歌曲数据并取每首歌的第一条统计记录（最新的）
+    const songsWithStats = relations
       .map(r => r.songs)
       .filter(Boolean)
-
-    // 获取每首歌的最新统计数据
-    const songsWithStats = await Promise.all(
-      songs.map(async (song: any) => {
-        const { data: latestStats } = await supabase
-          .from('song_stats')
-          .select('likes, favorites, comments, shares, fetched_at')
-          .eq('song_id', song.id)
-          .order('fetched_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-
-        return {
-          ...song,
-          latest_stats: latestStats || {
-            likes: 0,
-            favorites: 0,
-            comments: 0,
-            shares: 0,
-            fetched_at: null,
-          }
-        }
-      })
-    )
+      .map((song: any) => ({
+        ...song,
+        latest_stats: song.song_stats?.[0] || {
+          likes: 0,
+          favorites: 0,
+          comments: 0,
+          shares: 0,
+          fetched_at: null,
+        },
+        song_stats: undefined, // 移除原始数组，避免传输过多数据
+      }))
 
     return NextResponse.json({
       songs: songsWithStats,
       total: count,
       page,
       limit,
-      totalPages: Math.ceil(count || 0 / limit),
+      totalPages: Math.ceil((count || 0) / limit),
     })
 
   } catch (error) {

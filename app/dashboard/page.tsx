@@ -1,17 +1,15 @@
 // src/app/dashboard/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/auth-store'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Music, TrendingUp, Users, Settings } from 'lucide-react'
+import { Music, TrendingUp, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AddSongForm } from '@/components/songs/add-song-form-bk'
 import { SongList } from '@/components/songs/song-list'
-import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
 import { TriggerFetch } from '@/components/admin/trigger-fetch'
-
 
 interface DashboardStats {
   totalSongs: number
@@ -19,46 +17,55 @@ interface DashboardStats {
   totalLikes: number
 }
 
+interface MySongsResponse {
+  songs: Array<{
+    id: string
+    latest_stats?: {
+      likes: number
+      favorites: number
+      comments: number
+      shares: number
+    }
+  }>
+  total: number
+  page: number
+  limit: number
+}
+
+// 🚀 提取 fetch 函数，便于复用和测试
+async function fetchMySongs(limit = 10): Promise<MySongsResponse> {
+  const response = await fetch(`/api/songs/my-songs?limit=${limit}`)
+  if (!response.ok) {
+    throw new Error('Failed to fetch songs')
+  }
+  return response.json()
+}
+
 export default function DashboardPage() {
   const { user, isAdmin } = useAuthStore()
   const router = useRouter()
-  const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [stats, setStats] = useState<DashboardStats>({
-    totalSongs: 0,
-    todayGrowth: 0,
-    totalLikes: 0,
+  const queryClient = useQueryClient()
+
+  // 🚀 使用 React Query 获取最近 10 首歌曲数据
+  const { data, isLoading: loadingStats } = useQuery({
+    queryKey: ['my-songs', 'dashboard', user?.id],
+    queryFn: () => fetchMySongs(10),
+    enabled: !!user, // 只在用户登录时执行
+    staleTime: 5 * 60 * 1000, // 5分钟内认为数据新鲜
   })
-  const [loadingStats, setLoadingStats] = useState(true)
 
-  // 获取统计数据
-  useEffect(() => {
-    const fetchStats = async () => {
-      if (!user) return
-      try {
-        const response = await fetch('/api/songs/my-songs')
-        if (response.ok) {
-          const data = await response.json()
-          const songs = data.songs || []
-          const totalLikes = songs.reduce((sum: number, song: any) => 
-            sum + (song.latest_stats?.likes || 0), 0
-          )
-          setStats({
-            totalSongs: songs.length,
-            todayGrowth: 0,
-            totalLikes,
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching stats:', error)
-      } finally {
-        setLoadingStats(false)
-      }
-    }
-    fetchStats()
-  }, [user, refreshTrigger])
+  // 计算统计数据
+  const stats: DashboardStats = {
+    totalSongs: data?.total || 0, // 使用 total 字段获取真实总数
+    todayGrowth: 0,
+    totalLikes: data?.songs.reduce((sum, song) =>
+      sum + (song.latest_stats?.likes || 0), 0
+    ) || 0,
+  }
 
+  // 🚀 添加歌曲成功后，刷新数据
   const handleSongAdded = () => {
-    setRefreshTrigger(prev => prev + 1)
+    queryClient.invalidateQueries({ queryKey: ['my-songs'] })
   }
 
   return (
@@ -110,14 +117,14 @@ export default function DashboardPage() {
         <AddSongForm onSuccess={handleSongAdded} />
       </div>
 
-      <SongList refreshTrigger={refreshTrigger} />
+      <SongList />
 
       {isAdmin && (
         <>
           <Card className="mt-6 border-purple-200 dark:border-purple-800">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
+                <Music className="h-5 w-5" />
                 管理员功能
               </CardTitle>
               <CardDescription>您拥有管理员权限</CardDescription>

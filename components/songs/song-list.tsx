@@ -1,7 +1,8 @@
 // src/components/songs/song-list.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useAuthStore } from '@/store/auth-store'
 import { SongCard } from './song-card'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Music, Loader2, AlertCircle } from 'lucide-react'
@@ -24,40 +25,33 @@ interface Song {
   }
 }
 
-interface SongListProps {
-  refreshTrigger?: number
+interface MySongsResponse {
+  songs: Song[]
+  total: number
 }
 
-export function SongList({ refreshTrigger = 0 }: SongListProps) {
-  const [songs, setSongs] = useState<Song[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchSongs = async () => {
-    setIsLoading(true)
-    setError(null)
-
-    try {
-      const response = await fetch('/api/songs/my-songs')
-      
-      if (!response.ok) {
-        throw new Error('获取歌曲列表失败')
-      }
-
-      const data = await response.json()
-      setSongs(data.songs || [])
-    } catch (err) {
-      const message = err instanceof Error ? err.message : '未知错误'
-      setError(message)
-      console.error('Error fetching songs:', err)
-    } finally {
-      setIsLoading(false)
-    }
+// 🚀 提取 API 调用函数
+async function fetchMySongs(): Promise<MySongsResponse> {
+  const response = await fetch('/api/songs/my-songs?limit=10')
+  if (!response.ok) {
+    throw new Error('获取歌曲列表失败')
   }
+  return response.json()
+}
 
-  useEffect(() => {
-    fetchSongs()
-  }, [refreshTrigger])
+export function SongList() {
+  const { user } = useAuthStore()
+  const queryClient = useQueryClient()
+
+  // 🚀 使用 React Query 自动管理加载、错误和缓存状态
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['my-songs', 'list', user?.id],
+    queryFn: fetchMySongs,
+    enabled: !!user,
+    staleTime: 5 * 60 * 1000,
+  })
+
+  const songs = data?.songs || []
 
   if (isLoading) {
     return (
@@ -78,8 +72,10 @@ export function SongList({ refreshTrigger = 0 }: SongListProps) {
         <CardContent className="flex items-center justify-center py-12">
           <div className="text-center">
             <AlertCircle className="h-8 w-8 mx-auto mb-2 text-red-500" />
-            <p className="text-sm text-red-600 dark:text-red-400 mb-4">{error}</p>
-            <Button onClick={fetchSongs} variant="outline" size="sm">
+            <p className="text-sm text-red-600 dark:text-red-400 mb-4">
+              {error instanceof Error ? error.message : '未知错误'}
+            </p>
+            <Button onClick={() => refetch()} variant="outline" size="sm">
               重试
             </Button>
           </div>
@@ -120,11 +116,11 @@ export function SongList({ refreshTrigger = 0 }: SongListProps) {
             song={song}
             onViewDetails={() => {
               console.log('View details:', song.id)
-              // TODO: 跳转到详情页
               window.location.href = `/dashboard/songs/${song.id}`
             }}
             onDeleted={() => {
-              fetchSongs()
+              // 刷新歌曲列表缓存
+              queryClient.invalidateQueries({ queryKey: ['my-songs'] })
             }}
           />
         ))}
