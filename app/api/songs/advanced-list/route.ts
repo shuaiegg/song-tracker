@@ -115,6 +115,12 @@ export async function GET(request: Request) {
                 return true;
             });
 
+        processedSongs.sort((a, b) => {
+        const likesA = a.latest_stats?.likes || 0;
+        const likesB = b.latest_stats?.likes || 0;
+            return likesB - likesA; // 降序：B - A
+            });
+
         return NextResponse.json({
             songs: processedSongs,
             total: processedSongs.length
