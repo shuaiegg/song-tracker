@@ -70,7 +70,10 @@ export async function GET(request: Request) {
             .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
 
             // ✨ 限制每首歌只返回最新的一条 stats
-            .limit(1, { referencedTable: 'songs.song_stats' });
+            .limit(1, { referencedTable: 'songs.song_stats' })
+
+            // ✨ 设置主查询的限制，覆盖 Supabase 默认的 1000 行限制
+            .limit(10000);
 
         if (error) {
             console.error('Supabase query error:', error);
