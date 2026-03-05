@@ -47,31 +47,41 @@ export async function GET() {
       throw new Error(`获取歌曲失败: ${songsError.message}`)
     }
 
-    // 获取每首歌的追踪用户数和最新统计
-    const songsWithStats = await Promise.all(
-      songs.map(async (song) => {
-        // 追踪用户数
-        const { count: userCount } = await supabaseAdmin
-          .from('user_song_relations')
-          .select('*', { count: 'exact', head: true })
-          .eq('song_id', song.id)
+    // 批量获取用户数和最新统计（避免 N+1 查询）
+    const songIds = songs.map(s => s.id)
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-        // 最新统计
-        const { data: latestStats } = await supabaseAdmin
-          .from('song_stats')
-          .select('likes, favorites, comments, shares, fetched_at')
-          .eq('song_id', song.id)
-          .order('fetched_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
+    const [{ data: allRelations }, { data: allStats }] = await Promise.all([
+      supabaseAdmin.from('user_song_relations').select('song_id, rank').in('song_id', songIds),
+      supabaseAdmin
+        .from('song_stats')
+        .select('song_id, likes, favorites, comments, shares, fetched_at')
+        .in('song_id', songIds)
+        .gte('fetched_at', yesterday)
+        .order('fetched_at', { ascending: false }),
+    ])
 
-        return {
-          ...song,
-          user_count: userCount || 0,
-          latest_stats: latestStats,
-        }
-      })
-    )
+    // 每首歌的用户数 & rank（取第一个关联的 rank）
+    const userCountMap = new Map<string, number>()
+    const rankMap = new Map<string, string>()
+    for (const rel of allRelations || []) {
+      userCountMap.set(rel.song_id, (userCountMap.get(rel.song_id) || 0) + 1)
+      if (!rankMap.has(rel.song_id)) rankMap.set(rel.song_id, rel.rank)
+    }
+
+    // 每首歌最新一条统计（allStats 已按 fetched_at desc 排序，取首次出现）
+    type StatRow = NonNullable<typeof allStats>[number]
+    const latestStatsMap = new Map<string, StatRow>()
+    for (const stat of allStats || []) {
+      if (!latestStatsMap.has(stat.song_id)) latestStatsMap.set(stat.song_id, stat)
+    }
+
+    const songsWithStats = songs.map(song => ({
+      ...song,
+      rank: rankMap.get(song.id) ?? null,
+      user_count: userCountMap.get(song.id) || 0,
+      latest_stats: latestStatsMap.get(song.id) ?? null,
+    }))
 
     return NextResponse.json({
       songs: songsWithStats,

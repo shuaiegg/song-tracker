@@ -19,14 +19,17 @@ import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Loader2, Users, Music as MusicIcon, RefreshCw } from 'lucide-react'
 import { TriggerFetch } from '@/components/admin/trigger-fetch'
 import { formatCount } from '@/lib/parse-douyin-data'
+import { createClient } from '@/lib/supabase/client'
 
 export default function AdminPage() {
-  const { user, isAdmin, isLoading } = useAuthStore()
+  const { user, isAdmin, isLoading, setUser, setIsAdmin, setImpersonating } = useAuthStore()
   const router = useRouter()
   const [users, setUsers] = useState<any[]>([])
   const [songs, setSongs] = useState<any[]>([])
   const [loadingUsers, setLoadingUsers] = useState(true)
   const [loadingSongs, setLoadingSongs] = useState(true)
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!isLoading && (!user || !isAdmin)) {
@@ -35,24 +38,60 @@ export default function AdminPage() {
   }, [user, isAdmin, isLoading, router])
 
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdmin && !isLoading) {
       fetchUsers()
       fetchSongs()
     }
-  }, [isAdmin])
+  }, [isAdmin, isLoading])
 
   const fetchUsers = async () => {
     setLoadingUsers(true)
+    setFetchError(null)
     try {
       const response = await fetch('/api/admin/users')
-      if (response.ok) {
-        const data = await response.json()
-        setUsers(data.users)
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        setFetchError(err.error || `请求失败 (${response.status})`)
+        return
       }
+      const data = await response.json()
+      setUsers(data.users)
     } catch (error) {
       console.error('Error fetching users:', error)
+      setFetchError('网络错误，请刷新重试')
     } finally {
       setLoadingUsers(false)
+    }
+  }
+
+  const handleImpersonate = async (targetUser: { id: string; email: string }) => {
+    setImpersonatingId(targetUser.id)
+    try {
+      const res = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetUserId: targetUser.id }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        console.error('模拟登陆失败:', err.error)
+        return
+      }
+      const { hashedToken, targetUser: userInfo } = await res.json()
+      const supabase = createClient()
+      await supabase.auth.verifyOtp({ token_hash: hashedToken, type: 'email' })
+      await supabase.auth.refreshSession()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        setUser(session.user)
+        setIsAdmin(false)
+        setImpersonating({ userId: userInfo.id, email: userInfo.email! })
+      }
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('模拟登陆出错:', error)
+    } finally {
+      setImpersonatingId(null)
     }
   }
 
@@ -184,6 +223,8 @@ export default function AdminPage() {
                   <div className="flex justify-center py-8">
                     <Loader2 className="h-8 w-8 animate-spin" />
                   </div>
+                ) : fetchError ? (
+                  <div className="py-8 text-center text-red-500">{fetchError}</div>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -193,6 +234,7 @@ export default function AdminPage() {
                         <TableHead>追踪歌曲</TableHead>
                         <TableHead>注册时间</TableHead>
                         <TableHead>最后登录</TableHead>
+                        <TableHead>操作</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -213,10 +255,24 @@ export default function AdminPage() {
                             {new Date(u.created_at).toLocaleDateString('zh-CN')}
                           </TableCell>
                           <TableCell className="text-sm text-muted-foreground">
-                            {u.last_sign_in_at 
+                            {u.last_sign_in_at
                               ? new Date(u.last_sign_in_at).toLocaleDateString('zh-CN')
                               : '从未登录'
                             }
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={u.is_admin || impersonatingId === u.id}
+                              onClick={() => handleImpersonate({ id: u.id, email: u.email })}
+                            >
+                              {impersonatingId === u.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                '模拟登陆'
+                              )}
+                            </Button>
                           </TableCell>
                         </TableRow>
                       ))}

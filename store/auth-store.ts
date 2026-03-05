@@ -9,11 +9,13 @@ interface AuthState {
   isLoading: boolean
   isAdminLoading: boolean
   isInitialized: boolean // ✨ 新增：标记是否已完成初始化
+  impersonating: { userId: string; email: string } | null
   setUser: (user: User | null) => void
   setIsAdmin: (isAdmin: boolean) => void
   setIsLoading: (isLoading: boolean) => void
   setIsAdminLoading: (isAdminLoading: boolean) => void
   setIsInitialized: (isInitialized: boolean) => void
+  setImpersonating: (data: { userId: string; email: string } | null) => void
   reset: () => void
 }
 
@@ -25,12 +27,14 @@ export const useAuthStore = create<AuthState>()(
       isLoading: true,
       isAdminLoading: true,
       isInitialized: false,
+      impersonating: null,
       setUser: (user) => set({ user }),
       setIsAdmin: (isAdmin) => set({ isAdmin }),
       setIsLoading: (isLoading) => set({ isLoading }),
       setIsAdminLoading: (isAdminLoading) => set({ isAdminLoading }),
       setIsInitialized: (isInitialized) => set({ isInitialized }),
-      reset: () => set({ user: null, isAdmin: false, isLoading: false, isAdminLoading: false }),
+      setImpersonating: (data) => set({ impersonating: data }),
+      reset: () => set({ user: null, isAdmin: false, isLoading: false, isAdminLoading: false, impersonating: null }),
     }),
     {
       name: 'auth-storage',

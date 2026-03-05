@@ -71,7 +71,7 @@ export default function SongsListPage() {
 
   // ✨ 使用 React Query 缓存歌曲列表
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['songs-list', filters],
+    queryKey: ['songs-list', user?.id, filters],
     queryFn: async () => {
       // 构建查询参数
       const params = new URLSearchParams()

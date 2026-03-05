@@ -4,9 +4,11 @@
 import { useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuthStore } from '@/store/auth-store'
+import { useQueryClient } from '@tanstack/react-query'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { setUser, setIsAdmin, setIsLoading, reset, setIsAdminLoading, isInitialized, setIsInitialized } = useAuthStore()
+  const queryClient = useQueryClient()
 
   useEffect(() => {
     const supabase = createClient()
@@ -74,16 +76,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 监听认证状态变化
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setIsLoading(true)
 
         const currentUser = session?.user
 
         if (currentUser) {
           setUser(currentUser)
-          await checkAdmin(currentUser.id)
+          // 用户切换时（如模拟登陆）强制重新检查 admin 状态，避免旧 isAdmin 残留
+          const forceRefresh = event === 'SIGNED_IN' || event === 'USER_UPDATED'
+          await checkAdmin(currentUser.id, forceRefresh)
         } else {
           reset() // 用户登出或session失效时重置整个auth状态
+          queryClient.clear() // 清除所有缓存，防止不同用户看到上一个用户的数据
         }
 
         setIsLoading(false)

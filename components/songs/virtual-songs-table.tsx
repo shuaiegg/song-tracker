@@ -35,6 +35,7 @@ interface VirtualSongsTableProps {
   onSelectionChange: (songIds: string[]) => void
   isLoadingMore?: boolean
   onLoadMore?: () => void
+  indexOffset?: number
 }
 
 export function VirtualSongsTable({
@@ -43,6 +44,7 @@ export function VirtualSongsTable({
   onSelectionChange,
   isLoadingMore,
   onLoadMore,
+  indexOffset = 0,
 }: VirtualSongsTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -98,6 +100,7 @@ export function VirtualSongsTable({
               aria-label="全选"
             />
           </div>
+          <div className="w-[40px] text-muted-foreground">#</div>
           <div className="w-[80px]">封面</div>
           <div className="w-[200px]">歌曲信息</div>
           <div className="flex-1">扩展信息</div>
@@ -146,6 +149,11 @@ export function VirtualSongsTable({
                       onCheckedChange={(checked) => handleSelectSong(song.id, checked as boolean)}
                       aria-label={`选择 ${song.title}`}
                     />
+                  </div>
+
+                  {/* 序号 */}
+                  <div className="w-[40px] text-sm text-muted-foreground">
+                    {indexOffset + virtualRow.index + 1}
                   </div>
 
                   {/* 封面 */}

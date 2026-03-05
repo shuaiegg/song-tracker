@@ -80,6 +80,7 @@ The app uses a **hybrid authentication approach** to work around unreliable `onA
   - `supervisor`: Person responsible for tracking this song
 - `song_stats`: Time-series metrics (likes, favorites, comments, shares, fetched_at)
 - `daily_song_stats`: Daily rollup aggregates for historical analysis
+- `admins`: Admin access control table; `lib/admin.ts` provides `checkIsAdmin(userId)` helper
 
 **Extended Song Fields** (configured in `lib/song-fields-config.ts`):
 - Arrays: `lyricists`, `composers`, `producers`, `arrangers`, `mixing_engineers`, `recording_engineers`, `genres`
@@ -102,7 +103,7 @@ The app uses a **hybrid authentication approach** to work around unreliable `onA
    - Functions query Douyin API and insert records into `song_stats`
 
 3. **API Routes** (`app/api/`):
-   - `/api/douyin/fetch-track`: Parses Douyin track data from raw API response
+   - `/api/douyin/fetch-track`: Calls `lib/parse-douyin-data.ts` to extract structured song data from raw Douyin API response (reads from `seo_track` key)
    - `/api/songs/*`: CRUD operations for songs and user relations
    - `/api/admin/*`: Admin-only operations (trigger manual fetches, user management)
 
@@ -117,6 +118,16 @@ The app uses a **hybrid authentication approach** to work around unreliable `onA
   - `batch-upload-dialog.tsx`: Excel batch upload (uses `xlsx` library)
   - `song-filters.tsx`: Advanced filtering by extended fields
   - `update-rank-dialog.tsx`: Change tracking frequency
+
+**Charts** (`components/charts/`):
+- `stats-chart.tsx`: Hourly/recent stats time-series chart
+- `daily-stats-chart.tsx`: Daily rollup historical chart
+- `stat-cards.tsx`: Summary metric cards
+- Uses `recharts` library for all visualizations
+
+**Form Handling:**
+- `react-hook-form` + `zod` for form validation throughout the app
+- `sonner` (`toast()`) for user feedback/toast notifications
 
 **Styling:**
 - Tailwind CSS v4 with `@tailwindcss/postcss`
@@ -146,6 +157,11 @@ The app uses a **hybrid authentication approach** to work around unreliable `onA
 **Middleware** (`middleware.ts`):
 - Uses `@supabase/ssr` to update session on every request
 - Handles auth token refresh automatically
+
+### TypeScript Types & Hooks
+
+- **`types/index.ts`**: Central type definitions — `RankType`, `Song`, `SongStats`, `DailyStats`, `UserSongRelation`, `SongFormData`, `ParsedSongInfo`, `DouyinApiResponse`
+- **`hooks/use-fetch-song.ts`**: Custom hook for fetching/previewing a Douyin track by ID before adding it
 
 ## Important Development Notes
 

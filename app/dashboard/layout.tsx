@@ -9,6 +9,7 @@ import { logout } from '../(auth)/actions'
 import { Button } from '@/components/ui/button'
 import { LayoutDashboard, ListMusic, Music } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ImpersonationBanner } from '@/components/impersonation-banner'
 
 export default function DashboardLayout({
   children,
@@ -61,6 +62,7 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+      <ImpersonationBanner />
       {/* 顶部导航栏 - 现在在 Layout 中 */}
       <header className="border-b bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">

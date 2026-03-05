@@ -44,31 +44,27 @@ export async function GET() {
       throw new Error(`获取用户失败: ${usersError.message}`)
     }
 
-    // 获取每个用户的歌曲数量
-    const usersWithStats = await Promise.all(
-      users.users.map(async (u) => {
-        const { count } = await supabaseAdmin
-          .from('user_song_relations')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', u.id)
+    // 批量获取所有管理员信息和歌曲关联（避免 N+1 查询）
+    const [{ data: allAdmins }, { data: allRelations }] = await Promise.all([
+      supabaseAdmin.from('admins').select('user_id, role'),
+      supabaseAdmin.from('user_song_relations').select('user_id'),
+    ])
 
-        const { data: adminInfo } = await supabaseAdmin
-          .from('admins')
-          .select('role')
-          .eq('user_id', u.id)
-          .maybeSingle()
+    const adminMap = new Map((allAdmins || []).map(a => [a.user_id, a.role]))
+    const songCountMap = new Map<string, number>()
+    for (const rel of allRelations || []) {
+      songCountMap.set(rel.user_id, (songCountMap.get(rel.user_id) || 0) + 1)
+    }
 
-        return {
-          id: u.id,
-          email: u.email,
-          created_at: u.created_at,
-          last_sign_in_at: u.last_sign_in_at,
-          song_count: count || 0,
-          is_admin: !!adminInfo,
-          admin_role: adminInfo?.role || null,
-        }
-      })
-    )
+    const usersWithStats = users.users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      created_at: u.created_at,
+      last_sign_in_at: u.last_sign_in_at,
+      song_count: songCountMap.get(u.id) || 0,
+      is_admin: adminMap.has(u.id),
+      admin_role: adminMap.get(u.id) ?? null,
+    }))
 
     return NextResponse.json({
       users: usersWithStats,

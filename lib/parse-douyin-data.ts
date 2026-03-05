@@ -78,11 +78,11 @@ export function validateParsedSong(song: ParsedSongInfo | null): boolean {
  * 格式化数字显示（添加 K, M 等单位）
  */
 export function formatCount(count: number): string {
-  if (count >= 1000000) {
-    return `${(count / 1000000).toFixed(1)}M`
+  if (count >= 100000000) {
+    return `${(count / 100000000).toFixed(1)}亿`
   }
-  if (count >= 1000) {
-    return `${(count / 1000).toFixed(1)}K`
+  if (count >= 10000) {
+    return `${(count / 10000).toFixed(1)}w`
   }
   return count.toString()
 }
