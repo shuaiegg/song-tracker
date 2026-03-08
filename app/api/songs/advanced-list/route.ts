@@ -85,7 +85,7 @@ export async function GET(request: Request) {
             // ✨ 限制每首歌只返回最新的一条 stats
             .limit(1, { referencedTable: "songs.song_stats" })
             // ✨ 设置主查询的限制，覆盖 Supabase 默认的 1000 行限制
-            .limit(20000);
+            .limit(30000);
 
         if (error) {
             console.error("Supabase query error:", error);
@@ -145,9 +145,33 @@ export async function GET(request: Request) {
             return likesB - likesA; // 降序：B - A
         });
 
+        // 通过 RPC 函数获取每首歌最接近 7 天前的 likes
+        // DB 端用 DISTINCT ON 聚合，支持 2 万首以上规模，不受 PostgREST 行数限制影响
+        const weekAgoMap: Record<string, number> = {};
+        if (processedSongs.length > 0) {
+            const { data: weekAgoData, error: weekAgoError } = await supabase
+                .rpc("get_week_ago_likes")
+                .limit(30000);
+
+            if (weekAgoError) {
+                console.error("周变化 RPC 查询失败:", weekAgoError);
+            }
+
+            if (weekAgoData) {
+                for (const row of weekAgoData) {
+                    weekAgoMap[row.song_id] = row.likes;
+                }
+            }
+        }
+
+        const songsWithWeekAgo = processedSongs.map((song) => ({
+            ...song,
+            week_ago_likes: weekAgoMap[song.id] ?? null,
+        }));
+
         return NextResponse.json({
-            songs: processedSongs,
-            total: processedSongs.length,
+            songs: songsWithWeekAgo,
+            total: songsWithWeekAgo.length,
         });
     } catch (error: any) {
         console.error("获取高级列表失败:", error);

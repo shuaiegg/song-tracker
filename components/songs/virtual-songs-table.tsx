@@ -13,7 +13,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { MoreVertical, ExternalLink, Loader2 } from 'lucide-react'
+import { MoreVertical, ExternalLink, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { formatCount } from '@/lib/parse-douyin-data'
 import { Song } from '@/types'
 import Link from 'next/link'
@@ -26,6 +26,7 @@ interface SongWithStats extends Song {
     shares: number
     fetched_at: string | null
   } | null
+  week_ago_likes?: number | null
   supervisor?: string | null
 }
 
@@ -36,6 +37,8 @@ interface VirtualSongsTableProps {
   isLoadingMore?: boolean
   onLoadMore?: () => void
   indexOffset?: number
+  weekChangeSortOrder?: 'desc' | 'asc' | null
+  onWeekChangeSortOrderChange?: (order: 'desc' | 'asc' | null) => void
 }
 
 export function VirtualSongsTable({
@@ -45,6 +48,8 @@ export function VirtualSongsTable({
   isLoadingMore,
   onLoadMore,
   indexOffset = 0,
+  weekChangeSortOrder,
+  onWeekChangeSortOrderChange,
 }: VirtualSongsTableProps) {
   const parentRef = useRef<HTMLDivElement>(null)
 
@@ -104,8 +109,25 @@ export function VirtualSongsTable({
           <div className="w-[80px]">封面</div>
           <div className="w-[200px]">歌曲信息</div>
           <div className="flex-1">扩展信息</div>
-          <div className="w-[150px]">统计数据</div>
-          <div className="w-[50px]">Rank</div>
+          <button
+            className="w-[150px] flex items-center gap-1 hover:text-foreground transition-colors text-left"
+            onClick={() => {
+              if (!onWeekChangeSortOrderChange) return
+              if (weekChangeSortOrder === null) onWeekChangeSortOrderChange('desc')
+              else if (weekChangeSortOrder === 'desc') onWeekChangeSortOrderChange('asc')
+              else onWeekChangeSortOrderChange(null)
+            }}
+          >
+            统计数据
+            {weekChangeSortOrder === 'desc' ? (
+              <ArrowDown className="h-3 w-3" />
+            ) : weekChangeSortOrder === 'asc' ? (
+              <ArrowUp className="h-3 w-3" />
+            ) : (
+              <ArrowUpDown className="h-3 w-3 opacity-40" />
+            )}
+          </button>
+
           <div className="w-[100px]">负责人</div>
           <div className="w-[80px] text-right">操作</div>
         </div>
@@ -232,18 +254,24 @@ export function VirtualSongsTable({
                     {song.latest_stats ? (
                       <div className="space-y-0.5 text-xs">
                         <div>赞: {formatCount(song.latest_stats.likes)}</div>
-                        <div>评: {formatCount(song.latest_stats.comments)}</div>
+                        {(() => {
+                          const current = song.latest_stats.likes
+                          const prev = song.week_ago_likes
+                          if (prev == null) {
+                            return <div className="text-muted-foreground">周变化: --</div>
+                          }
+                          if (prev === 0) {
+                            return <div className="text-muted-foreground">周变化: --</div>
+                          }
+                          const pct = ((current - prev) / prev) * 100
+                          const sign = pct >= 0 ? '+' : ''
+                          const color = pct > 0 ? 'text-green-500' : pct < 0 ? 'text-red-500' : 'text-muted-foreground'
+                          return <div className={color}>周变化: {sign}{pct.toFixed(1)}%</div>
+                        })()}
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">未加载</div>
                     )}
-                  </div>
-
-                  {/* Rank */}
-                  <div className="w-[50px]">
-                    <Badge variant={song.rank === 'A' ? 'default' : 'outline'} className="text-xs">
-                      {song.rank}
-                    </Badge>
                   </div>
 
                   {/* 负责人 */}

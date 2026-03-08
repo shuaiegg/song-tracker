@@ -2,7 +2,7 @@
 
 'use client';
 
-import {useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth-store';
@@ -46,6 +46,7 @@ export default function SongsListPage() {
   const router = useRouter()
 
   const [selectedSongs, setSelectedSongs] = useState<string[]>([])
+  const [weekChangeSortOrder, setWeekChangeSortOrder] = useState<'desc' | 'asc' | null>(null)
   
   // 筛选条件
   const [filters, setFilters] = useState<FilterValues>({
@@ -103,7 +104,24 @@ export default function SongsListPage() {
     gcTime: 10 * 60 * 1000, // 10 分钟
   })
 
-  const songs = data || []
+  const rawSongs = data || []
+
+  const songs = useMemo(() => {
+    if (!weekChangeSortOrder) return rawSongs
+    return [...rawSongs].sort((a: any, b: any) => {
+      const pctA = (a.week_ago_likes != null && a.week_ago_likes > 0)
+        ? (a.latest_stats?.likes - a.week_ago_likes) / a.week_ago_likes
+        : null
+      const pctB = (b.week_ago_likes != null && b.week_ago_likes > 0)
+        ? (b.latest_stats?.likes - b.week_ago_likes) / b.week_ago_likes
+        : null
+      // 无数据的排最后
+      if (pctA === null && pctB === null) return 0
+      if (pctA === null) return 1
+      if (pctB === null) return -1
+      return weekChangeSortOrder === 'desc' ? pctB - pctA : pctA - pctB
+    })
+  }, [rawSongs, weekChangeSortOrder])
 
   // 应用筛选后清空选择
   const handleApplyFilters = () => {
@@ -182,6 +200,8 @@ export default function SongsListPage() {
             songs={songs}
             selectedSongs={selectedSongs}
             onSelectionChange={setSelectedSongs}
+            weekChangeSortOrder={weekChangeSortOrder}
+            onWeekChangeSortOrderChange={setWeekChangeSortOrder}
             />
 
 

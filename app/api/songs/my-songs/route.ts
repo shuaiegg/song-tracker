@@ -105,6 +105,14 @@ export async function GET(request: Request) {
 
     const totalLikes = Array.from(songStatsMap.values()).reduce((sum, likes) => sum + likes, 0)
 
+    // 获取一周前的总点赞数，复用 get_week_ago_likes RPC 函数
+    const { data: weekAgoData } = await supabase
+      .rpc('get_week_ago_likes')
+      .limit(30000)
+    const weekAgoTotalLikes = weekAgoData
+      ? weekAgoData.reduce((sum: number, row: { likes: number }) => sum + (row.likes || 0), 0)
+      : null
+
     return NextResponse.json({
       songs: songsWithStats,
       total: count,
@@ -113,6 +121,7 @@ export async function GET(request: Request) {
       totalPages: Math.ceil((count || 0) / limit),
       summary: {
         totalLikes,
+        weekAgoTotalLikes,
         totalSongs: count,
       },
     })
