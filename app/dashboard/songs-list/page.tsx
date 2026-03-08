@@ -3,7 +3,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth-store';
 import { SongFilters, FilterValues } from '@/components/songs/song-filters';
@@ -44,14 +44,15 @@ interface SongWithStats {
 export default function SongsListPage() {
   const { user, isLoading: authLoading, isInitialized } = useAuthStore()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [selectedSongs, setSelectedSongs] = useState<string[]>([])
   const [weekChangeSortOrder, setWeekChangeSortOrder] = useState<'desc' | 'asc' | null>(null)
-  
-  // 筛选条件
+
+  // 筛选条件：支持从 URL 参数预填 artist（从歌手页跳转）
   const [filters, setFilters] = useState<FilterValues>({
     search: '',
-    artist: '',
+    artist: searchParams.get('artist') || '',
     album: '',
     // singers: [],
     lyricists: [],

@@ -7,7 +7,7 @@ import Link from 'next/link'
 import { useAuthStore } from '@/store/auth-store'
 import { logout } from '../(auth)/actions'
 import { Button } from '@/components/ui/button'
-import { LayoutDashboard, ListMusic, Music } from 'lucide-react'
+import { LayoutDashboard, ListMusic, Music, Mic2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ImpersonationBanner } from '@/components/impersonation-banner'
 
@@ -40,8 +40,13 @@ export default function DashboardLayout({
     },
     {
       name: '歌曲列表',
-      href: '/dashboard/songs-list', // 假设你的歌曲列表页面路径是这个
+      href: '/dashboard/songs-list',
       icon: ListMusic,
+    },
+    {
+      name: '歌手',
+      href: '/dashboard/artists',
+      icon: Mic2,
     },
   ]
 
