@@ -12,6 +12,9 @@ import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // �
 import { toast } from 'sonner';
 import { VirtualSongsTable } from '@/components/songs/virtual-songs-table' // ✨ 改用虚拟滚动表格
 import { VirtualSongsTableSkeleton } from '@/components/songs/virtual-songs-table-skeleton'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { X } from 'lucide-react'
 
 interface SongWithStats {
     id: string
@@ -48,6 +51,8 @@ export default function SongsListPage() {
 
   const [selectedSongs, setSelectedSongs] = useState<string[]>([])
   const [weekChangeSortOrder, setWeekChangeSortOrder] = useState<'desc' | 'asc' | null>(null)
+  const [minLikes, setMinLikes] = useState('')
+  const [maxLikes, setMaxLikes] = useState('')
 
   // 筛选条件：支持从 URL 参数预填 artist（从歌手页跳转）
   const [filters, setFilters] = useState<FilterValues>({
@@ -108,21 +113,33 @@ export default function SongsListPage() {
   const rawSongs = data || []
 
   const songs = useMemo(() => {
-    if (!weekChangeSortOrder) return rawSongs
-    return [...rawSongs].sort((a: any, b: any) => {
+    const min = minLikes !== '' ? Number(minLikes) : null
+    const max = maxLikes !== '' ? Number(maxLikes) : null
+
+    let result = rawSongs
+    if (min !== null || max !== null) {
+      result = rawSongs.filter((s: any) => {
+        const likes = s.latest_stats?.likes ?? 0
+        if (min !== null && likes < min) return false
+        if (max !== null && likes > max) return false
+        return true
+      })
+    }
+
+    if (!weekChangeSortOrder) return result
+    return [...result].sort((a: any, b: any) => {
       const pctA = (a.week_ago_likes != null && a.week_ago_likes > 0)
         ? (a.latest_stats?.likes - a.week_ago_likes) / a.week_ago_likes
         : null
       const pctB = (b.week_ago_likes != null && b.week_ago_likes > 0)
         ? (b.latest_stats?.likes - b.week_ago_likes) / b.week_ago_likes
         : null
-      // 无数据的排最后
       if (pctA === null && pctB === null) return 0
       if (pctA === null) return 1
       if (pctB === null) return -1
       return weekChangeSortOrder === 'desc' ? pctB - pctA : pctA - pctB
     })
-  }, [rawSongs, weekChangeSortOrder])
+  }, [rawSongs, weekChangeSortOrder, minLikes, maxLikes])
 
   // 应用筛选后清空选择
   const handleApplyFilters = () => {
@@ -180,6 +197,38 @@ export default function SongsListPage() {
         onFiltersChange={setFilters}
         onApplyFilters={handleApplyFilters}
       />
+
+      {/* 赞数区间过滤 */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">赞数范围</span>
+        <Input
+          type="number"
+          placeholder="最低"
+          value={minLikes}
+          onChange={e => setMinLikes(e.target.value)}
+          className="w-32 h-8 text-sm"
+          min={0}
+        />
+        <span className="text-muted-foreground">~</span>
+        <Input
+          type="number"
+          placeholder="最高"
+          value={maxLikes}
+          onChange={e => setMaxLikes(e.target.value)}
+          className="w-32 h-8 text-sm"
+          min={0}
+        />
+        {(minLikes !== '' || maxLikes !== '') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-muted-foreground"
+            onClick={() => { setMinLikes(''); setMaxLikes('') }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
 
       {/* 批量统计面板 */}
       {selectedSongs.length > 0 && (
