@@ -51,6 +51,7 @@ export async function GET(request: Request) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
+      .limit(1, { referencedTable: 'songs.song_stats' })
       .range(offset, offset + limit - 1)
 
     if (relationsError) {
@@ -77,33 +78,8 @@ export async function GET(request: Request) {
         song_stats: undefined, // 移除原始数组，避免传输过多数据
       }))
 
-    // ✨ 优化：获取所有歌曲的总点赞数统计，限制每首歌只返回最新的一条
-    const { data: allStats } = await supabase
-      .from('user_song_relations')
-      .select(`
-        songs!inner (
-          id,
-          song_stats (
-            likes
-          )
-        )
-      `)
-      .eq('user_id', user.id)
-      .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
-      .limit(1, { referencedTable: 'songs.song_stats' }) // ✨ 每首歌只返回最新的一条
-
-    // 计算总点赞数：取每首歌的最新统计记录的点赞数
-    const songStatsMap = new Map<string, number>()
-    allStats?.forEach((rel: any) => {
-      const songId = rel.songs.id
-      const likes = rel.songs.song_stats?.[0]?.likes || 0
-      // 只保留每首歌的第一条记录（最新的）
-      if (!songStatsMap.has(songId)) {
-        songStatsMap.set(songId, likes)
-      }
-    })
-
-    const totalLikes = Array.from(songStatsMap.values()).reduce((sum, likes) => sum + likes, 0)
+    const { data: totalLikesData } = await supabase.rpc('get_current_total_likes')
+    const totalLikes = totalLikesData ?? 0
 
     // 获取一周前的总点赞数，复用 get_week_ago_likes RPC 函数
     const { data: weekAgoData } = await supabase
