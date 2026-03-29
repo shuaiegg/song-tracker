@@ -7,84 +7,81 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const page = parseInt(searchParams.get('page') || '1')
-  const limit = parseInt(searchParams.get('limit') || '10') // 默认改为10，大幅减少数据量
+  const limit = parseInt(searchParams.get('limit') || '10')
   const offset = (page - 1) * limit
 
   try {
     const supabase = await createClient()
 
-    // 获取当前用户
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-
     if (userError || !user) {
-      return NextResponse.json(
-        { error: '未登录' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
 
-    // 🚀 优化：使用单次查询获取歌曲和最新统计数据，避免 N+1 问题
-    const { data: relations, error: relationsError, count } = await supabase
-      .from('user_song_relations')
-      .select(`
-        id,
-        created_at,
-        song_id,
-        songs!inner (
+    // 查询1（歌曲列表）和查询2/3（汇总统计）并发执行
+    // 歌曲列表不再嵌套 song_stats，避免扫描大量历史记录
+    const [
+      { data: relations, error: relationsError, count },
+      { data: totalLikesData },
+      { data: weekAgoData },
+    ] = await Promise.all([
+      supabase
+        .from('user_song_relations')
+        .select(`
           id,
-          song_id,
-          title,
-          artist,
-          album,
-          cover_url,
-          rank,
           created_at,
-          song_stats (
-            likes,
-            favorites,
-            comments,
-            shares,
-            fetched_at
+          song_id,
+          songs!inner (
+            id,
+            song_id,
+            title,
+            artist,
+            album,
+            cover_url,
+            rank,
+            created_at
           )
-        )
-      `, { count: 'exact' })
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .order('fetched_at', { referencedTable: 'songs.song_stats', ascending: false })
-      .limit(1, { referencedTable: 'songs.song_stats' })
-      .range(offset, offset + limit - 1)
+        `, { count: 'exact' })
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1),
+      supabase.rpc('get_current_total_likes'),
+      supabase.rpc('get_week_ago_likes').limit(30000),
+    ])
 
     if (relationsError) {
       console.error('Error fetching user songs:', relationsError)
-      return NextResponse.json(
-        { error: '获取歌曲列表失败' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: '获取歌曲列表失败' }, { status: 500 })
     }
 
-    // 提取歌曲数据并取每首歌的第一条统计记录（最新的）
+    // 查询2：单独获取这10首歌的最新 stats（只看最近2天，数据量极小）
+    const songIds = relations?.map(r => r.song_id) ?? []
+    const defaultStats = { likes: 0, favorites: 0, comments: 0, shares: 0, fetched_at: null }
+
+    let statsMap = new Map<string, typeof defaultStats>()
+    if (songIds.length > 0) {
+      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+      const { data: recentStats } = await supabase
+        .from('song_stats')
+        .select('song_id, likes, favorites, comments, shares, fetched_at')
+        .in('song_id', songIds)
+        .gte('fetched_at', twoDaysAgo)
+        .order('fetched_at', { ascending: false })
+
+      recentStats?.forEach(s => {
+        if (!statsMap.has(s.song_id)) statsMap.set(s.song_id, s)
+      })
+    }
+
     const songsWithStats = relations
-      .map(r => r.songs)
+      ?.map(r => r.songs)
       .filter(Boolean)
       .map((song: any) => ({
         ...song,
-        latest_stats: song.song_stats?.[0] || {
-          likes: 0,
-          favorites: 0,
-          comments: 0,
-          shares: 0,
-          fetched_at: null,
-        },
-        song_stats: undefined, // 移除原始数组，避免传输过多数据
-      }))
+        latest_stats: statsMap.get(song.id) ?? defaultStats,
+      })) ?? []
 
-    const { data: totalLikesData } = await supabase.rpc('get_current_total_likes')
     const totalLikes = totalLikesData ?? 0
-
-    // 获取一周前的总点赞数，复用 get_week_ago_likes RPC 函数
-    const { data: weekAgoData } = await supabase
-      .rpc('get_week_ago_likes')
-      .limit(30000)
     const weekAgoTotalLikes = weekAgoData
       ? weekAgoData.reduce((sum: number, row: { likes: number }) => sum + (row.likes || 0), 0)
       : null
@@ -104,9 +101,6 @@ export async function GET(request: Request) {
 
   } catch (error) {
     console.error('Error in my-songs API:', error)
-    return NextResponse.json(
-      { error: '服务器错误' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: '服务器错误' }, { status: 500 })
   }
 }

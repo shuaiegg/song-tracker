@@ -6,7 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '@/store/auth-store'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Music, TrendingUp, Settings } from 'lucide-react'
+import { Music, TrendingUp, Settings, BarChart2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AddSongForm } from '@/components/songs/add-song-form-bk'
 import { SongList } from '@/components/songs/song-list'
@@ -105,10 +105,13 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => router.push('/dashboard/analytics')}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">总点赞数</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <BarChart2 className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {loadingStats ? (
@@ -132,6 +135,7 @@ export default function DashboardPage() {
                 })() : (
                   <p className="text-xs text-muted-foreground">所有歌曲累计点赞</p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">点击查看趋势 →</p>
               </>
             )}
           </CardContent>

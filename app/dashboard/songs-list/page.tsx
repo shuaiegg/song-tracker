@@ -53,6 +53,8 @@ export default function SongsListPage() {
   const [weekChangeSortOrder, setWeekChangeSortOrder] = useState<'desc' | 'asc' | null>(null)
   const [minLikes, setMinLikes] = useState('')
   const [maxLikes, setMaxLikes] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   // 筛选条件：支持从 URL 参数预填 artist（从歌手页跳转）
   const [filters, setFilters] = useState<FilterValues>({
@@ -118,10 +120,20 @@ export default function SongsListPage() {
 
     let result = rawSongs
     if (min !== null || max !== null) {
-      result = rawSongs.filter((s: any) => {
+      result = result.filter((s: any) => {
         const likes = s.latest_stats?.likes ?? 0
         if (min !== null && likes < min) return false
         if (max !== null && likes > max) return false
+        return true
+      })
+    }
+
+    if (startDate || endDate) {
+      result = result.filter((s: any) => {
+        const date = s.relation_created_at
+        if (!date) return false
+        if (startDate && date < startDate) return false
+        if (endDate && date > endDate + 'T23:59:59') return false
         return true
       })
     }
@@ -139,7 +151,7 @@ export default function SongsListPage() {
       if (pctB === null) return -1
       return weekChangeSortOrder === 'desc' ? pctB - pctA : pctA - pctB
     })
-  }, [rawSongs, weekChangeSortOrder, minLikes, maxLikes])
+  }, [rawSongs, weekChangeSortOrder, minLikes, maxLikes, startDate, endDate])
 
   // 应用筛选后清空选择
   const handleApplyFilters = () => {
@@ -224,6 +236,34 @@ export default function SongsListPage() {
             size="sm"
             className="h-8 px-2 text-muted-foreground"
             onClick={() => { setMinLikes(''); setMaxLikes('') }}
+          >
+            <X className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
+
+      {/* 添加日期范围过滤 */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm text-muted-foreground whitespace-nowrap">添加时间</span>
+        <Input
+          type="date"
+          value={startDate}
+          onChange={e => setStartDate(e.target.value)}
+          className="w-36 h-8 text-sm"
+        />
+        <span className="text-muted-foreground">~</span>
+        <Input
+          type="date"
+          value={endDate}
+          onChange={e => setEndDate(e.target.value)}
+          className="w-36 h-8 text-sm"
+        />
+        {(startDate !== '' || endDate !== '') && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 px-2 text-muted-foreground"
+            onClick={() => { setStartDate(''); setEndDate('') }}
           >
             <X className="h-3.5 w-3.5" />
           </Button>

@@ -49,6 +49,7 @@ export async function GET(request: Request) {
             .from("user_song_relations")
             .select(`
                 supervisor,
+                created_at,
                 songs!inner (
                     *,
                     song_stats (
@@ -117,6 +118,7 @@ export async function GET(request: Request) {
                     ...song,
                     latest_stats: latestStats,
                     supervisor: rel.supervisor,
+                    relation_created_at: rel.created_at,
                 };
             })
             .filter((song) => {
