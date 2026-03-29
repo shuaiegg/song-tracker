@@ -19,11 +19,13 @@ export async function GET() {
       return NextResponse.json({ error: '未登录' }, { status: 401 })
     }
 
+    type WeeklyIncrement = { week_start: string; weekly_new_likes: number }
+
     // 并发获取当前总点赞 + 每周增量
     const [{ data: currentTotal }, { data: weeklyIncrements, error: incrementsError }] =
       await Promise.all([
         supabase.rpc('get_current_total_likes'),
-        supabase.rpc('get_weekly_likes_increments'),
+        supabase.rpc('get_weekly_likes_increments') as unknown as Promise<{ data: WeeklyIncrement[] | null; error: unknown }>,
       ])
 
     if (incrementsError) {
