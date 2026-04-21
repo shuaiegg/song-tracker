@@ -16,7 +16,7 @@ interface DashboardStats {
   totalSongs: number
   todayGrowth: number
   totalLikes: number
-  weekAgoTotalLikes: number | null
+  sevenDayIncrement: number | null
 }
 
 interface MySongsResponse {
@@ -34,7 +34,7 @@ interface MySongsResponse {
   limit: number
   summary: {
     totalLikes: number
-    weekAgoTotalLikes: number | null
+    sevenDayIncrement: number | null
     totalSongs: number
   }
 }
@@ -66,7 +66,7 @@ export default function DashboardPage() {
     totalSongs: data?.summary.totalSongs || 0,
     todayGrowth: 0,
     totalLikes: data?.summary.totalLikes || 0,
-    weekAgoTotalLikes: data?.summary.weekAgoTotalLikes ?? null,
+    sevenDayIncrement: data?.summary.sevenDayIncrement ?? null,
   }
 
   // 🚀 添加歌曲成功后，刷新数据
@@ -122,14 +122,13 @@ export default function DashboardPage() {
             ) : (
               <>
                 <div className="text-2xl font-bold">{stats.totalLikes.toLocaleString()}</div>
-                {stats.weekAgoTotalLikes != null && stats.weekAgoTotalLikes > 0 ? (() => {
-                  const diff = stats.totalLikes - stats.weekAgoTotalLikes
-                  const pct = (diff / stats.weekAgoTotalLikes) * 100
-                  const sign = diff >= 0 ? '+' : ''
-                  const color = diff > 0 ? 'text-green-500' : diff < 0 ? 'text-red-500' : 'text-muted-foreground'
+                {stats.sevenDayIncrement != null && stats.sevenDayIncrement > 0 ? (() => {
+                  const inc = stats.sevenDayIncrement
+                  const base = stats.totalLikes - inc
+                  const pct = base > 0 ? ((inc / base) * 100).toFixed(1) : null
                   return (
-                    <p className={`text-xs ${color}`}>
-                      {sign}{diff.toLocaleString()} ({sign}{pct.toFixed(1)}%) 较一周前
+                    <p className="text-xs text-green-500">
+                      +{inc.toLocaleString()}{pct ? ` (${pct}%)` : ''} 过去7天新增
                     </p>
                   )
                 })() : (

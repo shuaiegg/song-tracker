@@ -46,7 +46,7 @@ export async function GET(request: Request) {
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1),
       supabase.rpc('get_current_total_likes'),
-      supabase.rpc('get_week_ago_likes').limit(30000),
+      supabase.rpc('get_total_likes_7days_ago'),
     ])
 
     if (relationsError) {
@@ -82,9 +82,8 @@ export async function GET(request: Request) {
       })) ?? []
 
     const totalLikes = totalLikesData ?? 0
-    const weekAgoTotalLikes = weekAgoData
-      ? weekAgoData.reduce((sum: number, row: { likes: number }) => sum + (row.likes || 0), 0)
-      : null
+    const totalLikes7DaysAgo = (weekAgoData as number | null) ?? 0
+    const sevenDayIncrement = totalLikes7DaysAgo > 0 ? totalLikes - totalLikes7DaysAgo : null
 
     return NextResponse.json({
       songs: songsWithStats,
@@ -94,7 +93,7 @@ export async function GET(request: Request) {
       totalPages: Math.ceil((count || 0) / limit),
       summary: {
         totalLikes,
-        weekAgoTotalLikes,
+        sevenDayIncrement,
         totalSongs: count,
       },
     })
