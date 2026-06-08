@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Search, Filter, X} from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -29,22 +29,6 @@ import {
 import { TagInput } from '@/components/ui/tag-input';
 
 
-// add debounce 
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue ] = useState<T>(value)
-
-  useEffect(()=>{
-    const handler = setTimeout(() => {
-      setDebouncedValue(value)
-    }, delay)
-
-    return () => {
-      clearTimeout(handler)
-    }
-  }, [value, delay])
-
-  return debouncedValue
-}
 
 
 
@@ -73,12 +57,6 @@ export function SongFilters({
     onApplyFilters
 }: SongFiltersProps) {
 
-    const [localSearch, setLocalSearch ] = useState(filters.search)
-
-    //set debounce 500ms
-    const debouncedSearch = useDebounce(localSearch, 500)
-
-
     // ✨ 使用 React Query 缓存字段建议
     const { data: suggestions = {} } = useQuery<Record<string, string[]>>({
         queryKey: ['field-suggestions-batch'],
@@ -96,14 +74,6 @@ export function SongFilters({
     const [isOpen, setIsOpen] = useState(false);
 
 
-     // ✨ 当防抖值变化时，自动搜索
-  useEffect(() => {
-    if (debouncedSearch !== filters.search) {
-      onFiltersChange({ ...filters, search: debouncedSearch })
-      onApplyFilters()
-    }
-  }, [debouncedSearch])
-
     //update single filter option
     const updateFilter = (key: keyof FilterValues, value: any) => {
         onFiltersChange({
@@ -114,7 +84,6 @@ export function SongFilters({
 
     //clear filter options
     const clearAllFilters = () => {
-        setLocalSearch('')  // 清空本地搜索框
         onFiltersChange({
             search: '',
             artist: '',
@@ -150,17 +119,11 @@ export function SongFilters({
             <div className="flex gap-2">
                 <div className="relative flex-1">
                     <Search  className="absolute left-3 top-1/2 - translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input 
+                  <Input
                         type="text"
                         placeholder="搜索歌名或歌手..."
-                        value={localSearch}
-                        onChange={(e) => setLocalSearch(e.target.value)}    // ✨ 修改处理函数
-                        // onChange={(e) => updateFilter('search', e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                onApplyFilters();
-                            }
-                        }}
+                        value={filters.search}
+                        onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
                         className="pl-9"
                         />
                 </div>

@@ -1,6 +1,6 @@
 // src/app/api/songs/advanced/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createServiceClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
     try {
@@ -10,6 +10,10 @@ export async function GET(request: Request) {
         if (!user) {
             return NextResponse.json({ error: "未登录" }, { status: 401 });
         }
+
+        // 用 service role 客户端查数据，绕过 song_stats 的 RLS 逐行子查询开销
+        // 鉴权已由上方 auth.getUser() 完成，下面所有查询都显式过滤 user_id
+        const supabaseService = createServiceClient();
 
         const { searchParams } = new URL(request.url);
 
@@ -38,21 +42,15 @@ export async function GET(request: Request) {
                 ) || [],
         };
 
-        /**
-         * 1. 核心查询：从关联表出发
-         * 使用 !inner 强制要求必须匹配到歌曲（Inner Join）
-         * 这样即便 songIds 有几万个，也不会写在 URL 里，而是由数据库内部处理
-         *
-         * ✨ 优化：只查询最新的 song_stats（使用 ...limit(1)）
-         */
-        let query = supabase
+        // 1. 核心查询：join latest_song_stats（每歌一行缓存），不再扫描历史统计表
+        let query = supabaseService
             .from("user_song_relations")
             .select(`
                 supervisor,
                 created_at,
                 songs!inner (
                     *,
-                    song_stats (
+                    latest_song_stats (
                         likes, favorites, comments, shares, fetched_at
                     )
                 )
@@ -71,21 +69,10 @@ export async function GET(request: Request) {
             query = query.eq("songs.rank", rank);
         }
 
-        // 3. 执行查询
-        // ✨ 优化：限制 song_stats 只返回最新的一条（使用 ...limit(1) 语法）
+        // 3. 主查询（周变化已移至前端异步加载，不阻塞此响应）
         const { data: rawRelations, error } = await query
-            // 第一：对主表 user_song_relations 进行排序（该表有 created_at）
             .order("created_at", { ascending: false })
-            // 第二：对关联的 songs 表进行排序
             .order("created_at", { referencedTable: "songs", ascending: false })
-            // 第三：对 song_stats 进行排序（必须使用 fetched_at）
-            .order("fetched_at", {
-                referencedTable: "songs.song_stats",
-                ascending: false,
-            })
-            // ✨ 限制每首歌只返回最新的一条 stats
-            .limit(1, { referencedTable: "songs.song_stats" })
-            // ✨ 设置主查询的限制，覆盖 Supabase 默认的 1000 行限制
             .limit(30000);
 
         if (error) {
@@ -105,8 +92,8 @@ export async function GET(request: Request) {
         const processedSongs = rawRelations
             .map((rel: any) => {
                 const song = rel.songs;
-                // 取关联查询中排在第一位的 stats
-                const latestStats = song.song_stats?.[0] || {
+                // latest_song_stats 是 1:1 关系，PostgREST 返回对象而非数组
+                const latestStats = song.latest_song_stats || {
                     likes: 0,
                     favorites: 0,
                     comments: 0,
@@ -147,33 +134,9 @@ export async function GET(request: Request) {
             return likesB - likesA; // 降序：B - A
         });
 
-        // 通过 RPC 函数获取每首歌最接近 7 天前的 likes
-        // DB 端用 DISTINCT ON 聚合，支持 2 万首以上规模，不受 PostgREST 行数限制影响
-        const weekAgoMap: Record<string, number> = {};
-        if (processedSongs.length > 0) {
-            const { data: weekAgoData, error: weekAgoError } = await supabase
-                .rpc("get_week_ago_likes")
-                .limit(30000);
-
-            if (weekAgoError) {
-                console.error("周变化 RPC 查询失败:", weekAgoError);
-            }
-
-            if (weekAgoData) {
-                for (const row of weekAgoData) {
-                    weekAgoMap[row.song_id] = row.likes;
-                }
-            }
-        }
-
-        const songsWithWeekAgo = processedSongs.map((song) => ({
-            ...song,
-            week_ago_likes: weekAgoMap[song.id] ?? null,
-        }));
-
         return NextResponse.json({
-            songs: songsWithWeekAgo,
-            total: songsWithWeekAgo.length,
+            songs: processedSongs,
+            total: processedSongs.length,
         });
     } catch (error: any) {
         console.error("获取高级列表失败:", error);

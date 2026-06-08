@@ -262,7 +262,7 @@ export function BatchUploadDialog({ onSuccess, trigger }: BatchUploadDialogProps
                     </Button>
                   </label>
                   <p className="text-sm text-muted-foreground mt-2">
-                    支持 .csv 和 .xlsx 文件，最大 5MB,500首每次
+                    支持 .csv 和 .xlsx 文件，最大 5MB,200首每次
                   </p>
                 </div>
               </div>

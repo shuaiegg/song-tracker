@@ -6,6 +6,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuthStore } from '@/store/auth-store';
+import { createClient } from '@/lib/supabase/client';
+
+const supabase = createClient();
 import { SongFilters, FilterValues } from '@/components/songs/song-filters';
 import { BatchStatsPanel } from '@/components/songs/batch-stats-panel';
 import { BatchUploadDialog } from '@/components/songs/batch-upload-dialog' // ✨ 新增导入
@@ -48,6 +51,8 @@ export default function SongsListPage() {
   const { user, isLoading: authLoading, isInitialized } = useAuthStore()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const [selectedSongs, setSelectedSongs] = useState<string[]>([])
   const [weekChangeSortOrder, setWeekChangeSortOrder] = useState<'desc' | 'asc' | null>(null)
@@ -80,13 +85,16 @@ export default function SongsListPage() {
 
   // ✨ 使用 React Query 缓存歌曲列表
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['songs-list', user?.id, filters],
+    // search/artist 在客户端 useMemo 过滤，不触发 API 请求
+    queryKey: ['songs-list', user?.id,
+      filters.rank, filters.album,
+      filters.lyricists.join(','), filters.composers.join(','),
+      filters.producers.join(','), filters.genres.join(','),
+      filters.mixing_engineers.join(','), filters.recording_engineers.join(','),
+    ],
     queryFn: async () => {
-      // 构建查询参数
       const params = new URLSearchParams()
 
-      if (filters.search) params.append('search', filters.search)
-      if (filters.artist) params.append('artist', filters.artist)
       if (filters.album) params.append('album', filters.album)
       if (filters.rank !== 'all') params.append('rank', filters.rank)
 
@@ -114,11 +122,50 @@ export default function SongsListPage() {
 
   const rawSongs = data || []
 
+  // 周变化异步加载：不阻塞主列表，加载完后自动填充
+  const { data: weekAgoData } = useQuery({
+    queryKey: ['week-ago-likes', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_week_ago_likes')
+      if (error) {
+        console.error('周变化查询失败:', error)
+        return []
+      }
+      return data || []
+    },
+    enabled: !!user,
+    staleTime: 10 * 60 * 1000,
+    retry: 1,
+  })
+
+  const weekAgoMap = useMemo<Record<string, number>>(() => {
+    const map: Record<string, number> = {}
+    weekAgoData?.forEach((row: any) => { map[row.song_id] = row.likes })
+    return map
+  }, [weekAgoData])
+
   const songs = useMemo(() => {
+    // 先把 week_ago_likes 合并进每首歌（weekAgoMap 加载前为 null，加载后自动更新）
+    let result = rawSongs.map((s: any) => ({
+      ...s,
+      week_ago_likes: weekAgoMap[s.id] ?? null,
+    }))
+
+    // 客户端文本搜索：即时响应，不触发 API
+    if (filters.search.trim()) {
+      const q = filters.search.toLowerCase()
+      result = result.filter((s: any) =>
+        s.title?.toLowerCase().includes(q) || s.artist?.toLowerCase().includes(q)
+      )
+    }
+    if (filters.artist.trim()) {
+      const a = filters.artist.toLowerCase()
+      result = result.filter((s: any) => s.artist?.toLowerCase().includes(a))
+    }
+
     const min = minLikes !== '' ? Number(minLikes) : null
     const max = maxLikes !== '' ? Number(maxLikes) : null
 
-    let result = rawSongs
     if (min !== null || max !== null) {
       result = result.filter((s: any) => {
         const likes = s.latest_stats?.likes ?? 0
@@ -151,7 +198,7 @@ export default function SongsListPage() {
       if (pctB === null) return -1
       return weekChangeSortOrder === 'desc' ? pctB - pctA : pctA - pctB
     })
-  }, [rawSongs, weekChangeSortOrder, minLikes, maxLikes, startDate, endDate])
+  }, [rawSongs, weekAgoMap, weekChangeSortOrder, minLikes, maxLikes, startDate, endDate, filters.search, filters.artist])
 
   // 应用筛选后清空选择
   const handleApplyFilters = () => {
@@ -163,7 +210,7 @@ export default function SongsListPage() {
   const selectedSongsData = songs.filter((song: { id: string; }) => selectedSongs.includes(song.id))
 
   // ✨ 优化：只在首次初始化时显示骨架屏，刷新时直接显示上次的内容
-  if ((authLoading && !isInitialized) || !user) {
+  if (!mounted || (authLoading && !isInitialized) || !user) {
     return (
       <div className="container mx-auto py-6 space-y-6">
         {/* 页面标题骨架 */}
